@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Filament\Resources\Waitlists\Schemas;
+namespace App\Filament\Resources\CustomerLoyalties\Schemas;
 
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Schema;
 
-class WaitlistInfolist
+class CustomerLoyaltyInfolist
 {
     public static function configure(Schema $schema): Schema
     {
@@ -13,13 +13,15 @@ class WaitlistInfolist
             ->components([
                 TextEntry::make('customer.name')
                     ->label('Customer'),
-                TextEntry::make('branch.name')
-                    ->label('Branch'),
-                TextEntry::make('party_size')
+                TextEntry::make('restaurant.name')
+                    ->label('Restaurant'),
+                TextEntry::make('visit_count')
                     ->numeric(),
-                TextEntry::make('status')
-                    ->badge(),
-                
+                TextEntry::make('tier.name')
+                    ->label('Tier'),
+                TextEntry::make('last_visit_at')
+                    ->dateTime()
+                    ->placeholder('-'),
                 TextEntry::make('created_at')
                     ->dateTime()
                     ->placeholder('-'),

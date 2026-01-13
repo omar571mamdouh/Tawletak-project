@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\CustomerLoyalty;
+use App\Models\LoyaltyTier;
 
 class Offer extends Model
 {
@@ -38,4 +40,42 @@ class Offer extends Model
     {
         return $this->hasMany(OfferRedemption::class, 'offer_id');
     }
+
+    // App\Models\Offer.php
+
+public function restaurantId(): ?int
+{
+    return $this->branch?->restaurant_id;
+}
+
+public function isEligibleForCustomer(int $customerId): bool
+{
+    // لو الأوفر مفتوح لأي حد
+    if (blank($this->eligible_loyalty_tier)) {
+        return true;
+    }
+
+    $restaurantId = $this->branch?->restaurant_id;
+    if (! $restaurantId) {
+        return false;
+    }
+
+    $loyalty = CustomerLoyalty::query()
+        ->where('customer_id', $customerId)
+        ->where('restaurant_id', $restaurantId)
+        ->with('tier')
+        ->first();
+
+    if (! $loyalty || ! $loyalty->tier) {
+        return false;
+    }
+
+    $requiredTier = LoyaltyTier::where('name', $this->eligible_loyalty_tier)->first();
+    if (! $requiredTier) {
+        return false;
+    }
+
+    return (int) $loyalty->tier->min_visits >= (int) $requiredTier->min_visits;
+}
+
 }

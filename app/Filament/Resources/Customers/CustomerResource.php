@@ -17,6 +17,8 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use App\Filament\Resources\Customers\RelationManagers\ReservationsRelationManager;
 use App\Filament\Resources\Customers\RelationManagers\WaitlistsRelationManager;
+use App\Filament\Resources\Customers\RelationManagers\LoyaltiesRelationManager;
+use App\Filament\Resources\Customers\RelationManagers\OfferRedemptionsRelationManager;
 
 class CustomerResource extends Resource
 {
@@ -50,6 +52,8 @@ class CustomerResource extends Resource
         return [
             ReservationsRelationManager::class,
             WaitlistsRelationManager::class,
+            LoyaltiesRelationManager::class,
+            OfferRedemptionsRelationManager::class,
         ];
     }
 

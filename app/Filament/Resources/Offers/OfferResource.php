@@ -15,6 +15,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use App\Filament\Resources\Offers\RelationManagers\RedemptionsRelationManager;
 
 class OfferResource extends Resource
 {
@@ -46,7 +47,7 @@ class OfferResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            RedemptionsRelationManager::class,
         ];
     }
 

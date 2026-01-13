@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\Waitlists\Tables;
+namespace App\Filament\Resources\Visits\Tables;
 
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -9,7 +9,7 @@ use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
-class WaitlistsTable
+class VisitsTable
 {
     public static function configure(Table $table): Table
     {
@@ -19,12 +19,21 @@ class WaitlistsTable
                     ->searchable(),
                 TextColumn::make('branch.name')
                     ->searchable(),
-                TextColumn::make('party_size')
+                TextColumn::make('reservation.id')
+                    ->searchable(),
+                TextColumn::make('table.id')
+                    ->searchable(),
+                TextColumn::make('seated_at')
+                    ->dateTime()
+                    ->sortable(),
+                TextColumn::make('left_at')
+                    ->dateTime()
+                    ->sortable(),
+                TextColumn::make('bill_amount')
                     ->numeric()
                     ->sortable(),
                 TextColumn::make('status')
                     ->badge(),
-               
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

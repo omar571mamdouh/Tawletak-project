@@ -57,4 +57,9 @@ class Reservation extends Model
     {
         return $this->hasMany(OfferRedemption::class, 'reservation_id');
     }
+
+    public function visit() 
+    { 
+        return $this->hasOne(Visit::class); 
+    }
 }

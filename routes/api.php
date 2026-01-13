@@ -4,11 +4,15 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\RestaurantController;
 use App\Http\Controllers\Api\ReservationController;
+use App\Http\Controllers\Api\CustomerController;
 
 
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
+Route::get('customers', [CustomerController::class, 'index']);
+Route::get('customers/{customer}', [CustomerController::class, 'show']);
 
 
 Route::apiResource('restaurants', RestaurantController::class);

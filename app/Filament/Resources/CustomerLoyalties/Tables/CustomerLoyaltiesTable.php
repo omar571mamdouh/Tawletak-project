@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\Waitlists\Tables;
+namespace App\Filament\Resources\CustomerLoyalties\Tables;
 
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -9,7 +9,7 @@ use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
-class WaitlistsTable
+class CustomerLoyaltiesTable
 {
     public static function configure(Table $table): Table
     {
@@ -17,14 +17,16 @@ class WaitlistsTable
             ->columns([
                 TextColumn::make('customer.name')
                     ->searchable(),
-                TextColumn::make('branch.name')
+                TextColumn::make('restaurant.name')
                     ->searchable(),
-                TextColumn::make('party_size')
+                TextColumn::make('visit_count')
                     ->numeric()
                     ->sortable(),
-                TextColumn::make('status')
-                    ->badge(),
-               
+                TextColumn::make('tier.name')
+                    ->searchable(),
+                TextColumn::make('last_visit_at')
+                    ->dateTime()
+                    ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

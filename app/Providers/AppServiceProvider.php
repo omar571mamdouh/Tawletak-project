@@ -8,6 +8,7 @@ use App\Models\TableStatus;
 use App\Observers\TableObserver;
 use App\Observers\TableStatusObserver;
 use App\Models\Reservation;
+use App\Observers\ReservationWaitlistObserver;
 use App\Observers\ReservationObserver;
 
 class AppServiceProvider extends ServiceProvider
@@ -28,5 +29,6 @@ class AppServiceProvider extends ServiceProvider
         Table::observe(TableObserver::class);
         TableStatus::observe(TableStatusObserver::class);
         Reservation::observe(ReservationObserver::class);
+        Reservation::observe(ReservationWaitlistObserver::class);
     }
 }

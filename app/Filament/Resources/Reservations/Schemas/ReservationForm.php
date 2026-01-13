@@ -8,6 +8,10 @@ use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Actions\Action;
+
+use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Actions as SchemaActions;
 
 class ReservationForm
 {
@@ -102,32 +106,147 @@ class ReservationForm
                     ]),
 
                 Section::make(__('Timestamps'))
-                    ->description(__('Track important reservation events'))
-                    ->schema([
-                        Grid::make(2)->schema([
-                            DateTimePicker::make('confirmed_at')
-                                ->label(__('Confirmed At'))
-                                ->nullable()
-                                ->seconds(false),
+    ->description(__('Track important reservation events'))
+    ->schema([
+        Grid::make(2)->schema([
+            SchemaActions::make([
+                Action::make('set_confirmed_now')
+                    ->label(__('Set Confirmed Now'))
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->visible(fn ($record) => filled($record) && blank($record->confirmed_at) && $record->status !== 'cancelled')
+                    ->action(function ($record) {
+                        $record->update([
+                            'status' => 'confirmed',
+                            'confirmed_at' => now(),
+                        ]);
 
-                            DateTimePicker::make('cancelled_at')
-                                ->label(__('Cancelled At'))
-                                ->nullable()
-                                ->seconds(false),
+                        Notification::make()->title(__('Confirmed timestamp set'))->success()->send();
+                    }),
 
-                            DateTimePicker::make('seated_at')
-                                ->label(__('Seated At'))
-                                ->nullable()
-                                ->seconds(false),
+                Action::make('clear_confirmed')
+                    ->label(__('Clear Confirmed'))
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('gray')
+                    ->visible(fn ($record) => filled($record) && filled($record->confirmed_at))
+                    ->requiresConfirmation()
+                    ->action(function ($record) {
+                        $record->update([
+                            'confirmed_at' => null,
+                            // اختياري: رجّع status
+                            // 'status' => 'pending',
+                        ]);
 
-                            DateTimePicker::make('completed_at')
-                                ->label(__('Completed At'))
-                                ->nullable()
-                                ->seconds(false),
-                        ]),
-                    ])
-                    ->collapsible()
-                    ->collapsed(true),
+                        Notification::make()->title(__('Confirmed timestamp cleared'))->success()->send();
+                    }),
+            ])->columns(1),
+
+            SchemaActions::make([
+                Action::make('set_cancelled_now')
+                    ->label(__('Set Cancelled Now'))
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->visible(fn ($record) => filled($record) && blank($record->cancelled_at) && $record->status !== 'completed')
+                    ->action(function ($record) {
+                        $record->update([
+                            'status' => 'cancelled',
+                            'cancelled_at' => now(),
+                        ]);
+
+                        Notification::make()->title(__('Cancelled timestamp set'))->danger()->send();
+                    }),
+
+                Action::make('clear_cancelled')
+                    ->label(__('Clear Cancelled'))
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('gray')
+                    ->visible(fn ($record) => filled($record) && filled($record->cancelled_at))
+                    ->requiresConfirmation()
+                    ->action(function ($record) {
+                        $record->update([
+                            'cancelled_at' => null,
+                        ]);
+
+                        Notification::make()->title(__('Cancelled timestamp cleared'))->success()->send();
+                    }),
+            ])->columns(1),
+
+            SchemaActions::make([
+                Action::make('set_seated_now')
+                    ->label(__('Set Seated Now'))
+                    ->icon('heroicon-o-user-group')
+                    ->color('warning')
+                    ->visible(fn ($record) => filled($record)
+                        && blank($record->seated_at)
+                        && $record->status === 'confirmed'
+                        && blank($record->cancelled_at)
+                    )
+                    ->action(function ($record) {
+                        $record->update([
+                            'status' => 'seated',
+                            'seated_at' => now(),
+                        ]);
+
+                        Notification::make()->title(__('Seated timestamp set'))->success()->send();
+                    }),
+
+                Action::make('clear_seated')
+                    ->label(__('Clear Seated'))
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('gray')
+                    ->visible(fn ($record) => filled($record) && filled($record->seated_at))
+                    ->requiresConfirmation()
+                    ->action(function ($record) {
+                        $record->update([
+                            'seated_at' => null,
+                            // اختياري: رجّع status
+                            // 'status' => 'confirmed',
+                        ]);
+
+                        Notification::make()->title(__('Seated timestamp cleared'))->success()->send();
+                    }),
+            ])->columns(1),
+
+            SchemaActions::make([
+                Action::make('set_completed_now')
+                    ->label(__('Set Completed Now'))
+                    ->icon('heroicon-o-flag')
+                    ->color('gray')
+                    ->visible(fn ($record) => filled($record)
+                        && blank($record->completed_at)
+                        && $record->status === 'seated'
+                        && blank($record->cancelled_at)
+                    )
+                    ->action(function ($record) {
+                        $record->update([
+                            'status' => 'completed',
+                            'completed_at' => now(),
+                        ]);
+
+                        Notification::make()->title(__('Completed timestamp set'))->success()->send();
+                    }),
+
+                Action::make('clear_completed')
+                    ->label(__('Clear Completed'))
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('gray')
+                    ->visible(fn ($record) => filled($record) && filled($record->completed_at))
+                    ->requiresConfirmation()
+                    ->action(function ($record) {
+                        $record->update([
+                            'completed_at' => null,
+                            // اختياري: رجّع status
+                            // 'status' => 'seated',
+                        ]);
+
+                        Notification::make()->title(__('Completed timestamp cleared'))->success()->send();
+                    }),
+            ])->columns(1),
+        ]),
+    ])
+    ->collapsible()
+    ->collapsed(true),
             ]);
     }
 }

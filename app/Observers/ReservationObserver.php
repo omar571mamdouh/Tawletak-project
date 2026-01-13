@@ -4,6 +4,10 @@ namespace App\Observers;
 
 use App\Models\Reservation;
 use App\Models\ReservationEvent;
+use App\Models\Visit;
+use App\Models\CustomerLoyalty;
+use App\Models\LoyaltyTier;
+use Illuminate\Support\Facades\DB;
 
 class ReservationObserver
 {
@@ -53,6 +57,19 @@ class ReservationObserver
                 'completed_at' => $reservation->completed_at,
             ]);
 
+            // ✅ Visits + Loyalty hooks
+            if ($to === 'seated') {
+                $this->syncVisitAndLoyaltyOnSeated($reservation);
+            }
+
+            if ($to === 'completed') {
+                $this->closeVisitOnCompleted($reservation);
+            }
+
+            if ($to === 'cancelled') {
+                $this->cancelVisitOnCancelled($reservation);
+            }
+
             ReservationEvent::create([
                 'reservation_id' => $reservation->id,
                 'event_type'     => $to, // confirmed/cancelled/seated/completed...
@@ -80,5 +97,112 @@ class ReservationObserver
                 ],
             ]);
         }
+    }
+
+    /**
+     * لما Reservation تبقى seated:
+     * - create Visit مرة واحدة (idempotent by reservation_id)
+     * - update customer_loyalty (visit_count + tier_id + last_visit_at)
+     */
+    private function syncVisitAndLoyaltyOnSeated(Reservation $reservation): void
+    {
+        DB::transaction(function () use ($reservation) {
+
+            // ✅ اضمن seated_at موجود
+            $seatedAt = $reservation->seated_at ?? now();
+
+            // ✅ Create visit once per reservation
+            $visit = Visit::firstOrCreate(
+                ['reservation_id' => $reservation->id],
+                [
+                    'customer_id' => $reservation->customer_id,
+                    'branch_id'   => $reservation->branch_id,
+                    'table_id'    => $reservation->table_id,
+                    'seated_at'   => $seatedAt,
+                    'status'      => 'active',
+                ]
+            );
+
+            // لو الزيارة موجودة قبل كده، متحسبش loyalty تاني
+            if (! $visit->wasRecentlyCreated) {
+                return;
+            }
+
+            // ✅ restaurant_id من branch (لازم علاقة branch موجودة وفيها restaurant_id)
+            // تأكد في Reservation Model عندك:
+            // public function branch(){ return $this->belongsTo(RestaurantBranch::class,'branch_id'); }
+            $branch = $reservation->branch;
+            $restaurantId = $branch?->restaurant_id;
+
+            if (! $restaurantId) {
+                // لو حصل لأي سبب branch مش محمّل أو restaurant_id مش موجود
+                // هنوقف هنا عشان مانكسرش العملية
+                return;
+            }
+
+            // ✅ default Bronze tier
+            $bronzeTierId = LoyaltyTier::where('name', 'Bronze')->value('id');
+
+            // ✅ Get / Create loyalty row for (customer, restaurant)
+            $loyalty = CustomerLoyalty::firstOrCreate(
+                [
+                    'customer_id'   => $reservation->customer_id,
+                    'restaurant_id' => $restaurantId,
+                ],
+                [
+                    'visit_count'   => 0,
+                    'tier_id'       => $bronzeTierId,
+                    'last_visit_at' => null,
+                ]
+            );
+
+            // ✅ Update count + last visit
+            $loyalty->visit_count = ($loyalty->visit_count ?? 0) + 1;
+            $loyalty->last_visit_at = $visit->seated_at;
+
+            // ✅ Resolve tier based on min_visits
+            // أعلى min_visits <= visit_count
+            $tierId = LoyaltyTier::query()
+                ->where('min_visits', '<=', $loyalty->visit_count)
+                ->orderByDesc('min_visits')
+                ->value('id');
+
+            if ($tierId) {
+                $loyalty->tier_id = $tierId;
+            } elseif ($bronzeTierId) {
+                $loyalty->tier_id = $bronzeTierId;
+            }
+
+            $loyalty->save();
+        });
+    }
+
+    /**
+     * لما Reservation تبقى completed:
+     * - اقفل Visit المرتبط بالحجز لو كان active
+     */
+    private function closeVisitOnCompleted(Reservation $reservation): void
+    {
+        Visit::where('reservation_id', $reservation->id)
+            ->where('status', 'active')
+            ->update([
+                'status'  => 'completed',
+                'left_at' => now(),
+            ]);
+    }
+
+    /**
+     * لما Reservation تبقى cancelled:
+     * - اقفل Visit المرتبط بالحجز لو كان active
+     * - ملاحظة: هنا مش بننقص loyalty (اختيار شائع في المطاعم)
+     */
+    private function cancelVisitOnCancelled(Reservation $reservation): void
+    {
+        Visit::where('reservation_id', $reservation->id)
+            ->where('status', 'active')
+            ->update([
+                'status'  => 'cancelled',
+                'left_at' => now(),
+            ]);
     }
 }

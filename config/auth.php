@@ -40,6 +40,21 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+
+
+
+          // للـ super_admin (لو حابة)
+        'api' => [
+            'driver' => 'sanctum',
+            'provider' => 'users',
+    ],
+
+    // للـ staff
+        'staff' => [
+            'driver' => 'sanctum',
+            'provider' => 'restaurant_staff',
+    ],
     ],
 
     /*
@@ -63,6 +78,12 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', App\Models\User::class),
+        ],
+
+
+        'restaurant_staff' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\RestaurantStaff::class,
         ],
 
         // 'users' => [

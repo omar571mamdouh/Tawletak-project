@@ -242,10 +242,6 @@ private function syncTableStatus(Reservation $reservation): void
             (int) $statusRow->current_reservation_id === (int) $reservation->id
                 ? $statusRow->update([
                     'status' => 'available',
-                    'current_reservation_id' => $reservation->id,     
-                    'occupied_since' => $statusRow->occupied_since,   
-                    'estimated_free_at' => $statusRow->estimated_free_at,
-
                 ])
                 : null
         ),

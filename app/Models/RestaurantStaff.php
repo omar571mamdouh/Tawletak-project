@@ -5,9 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Laravel\Sanctum\HasApiTokens;
 
-class RestaurantStaff extends Model
+class RestaurantStaff extends Authenticatable
 {
+    use HasApiTokens;
+
     protected $table = 'restaurant_staff';
 
     protected $fillable = [
@@ -25,6 +29,12 @@ class RestaurantStaff extends Model
         'is_active' => 'boolean',
     ];
 
+    protected $hidden = [
+    'password_hash',
+    'remember_token',
+];
+
+
     public function restaurant(): BelongsTo
     {
         return $this->belongsTo(Restaurant::class, 'restaurant_id');
@@ -39,4 +49,10 @@ class RestaurantStaff extends Model
     {
         return $this->hasMany(TableStatusHistory::class, 'changed_by_staff_id');
     }
+
+    public function getAuthPassword(): string
+{
+    return (string) $this->password_hash;
+}
+
 }

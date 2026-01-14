@@ -8,6 +8,7 @@ use App\Models\Visit;
 use App\Models\CustomerLoyalty;
 use App\Models\LoyaltyTier;
 use Illuminate\Support\Facades\DB;
+use App\Models\TableStatus;
 
 class ReservationObserver
 {
@@ -25,6 +26,8 @@ class ReservationObserver
                 'source' => $reservation->source,
             ],
         ]);
+
+        $this->syncTableStatus($reservation);
     }
 
     public function updated(Reservation $reservation): void
@@ -56,6 +59,8 @@ class ReservationObserver
                 'seated_at'    => $reservation->seated_at,
                 'completed_at' => $reservation->completed_at,
             ]);
+
+            $this->syncTableStatus($reservation);
 
             // ✅ Visits + Loyalty hooks
             if ($to === 'seated') {
@@ -205,4 +210,62 @@ class ReservationObserver
                 'left_at' => now(),
             ]);
     }
+
+
+private function syncTableStatus(Reservation $reservation): void
+{
+    if (! $reservation->table_id) return;
+
+    $statusRow = TableStatus::firstOrCreate(
+        ['table_id' => $reservation->table_id],
+        ['status' => 'available']
+    );
+
+    $now = now();
+
+    match ($reservation->status) {
+        'confirmed' => $statusRow->update([
+            'status'                 => 'reserved',
+            'current_reservation_id' => $reservation->id,
+            'occupied_since'         => null,
+            'estimated_free_at'      => $this->calcEstimatedFreeAt($reservation),
+        ]),
+
+        'seated' => $statusRow->update([
+            'status'                 => 'occupied',
+            'current_reservation_id' => $reservation->id,
+            'occupied_since'         => $reservation->seated_at ?? $now,
+            'estimated_free_at'      => $this->calcEstimatedFreeAt($reservation),
+        ]),
+
+        'cancelled', 'completed' => (
+            (int) $statusRow->current_reservation_id === (int) $reservation->id
+                ? $statusRow->update([
+                    'status'                 => 'available',
+                    'current_reservation_id' => null,
+                    'occupied_since'         => null,
+                    'estimated_free_at'      => null,
+                ])
+                : null
+        ),
+
+        default => null,
+    };
+}
+
+
+private function calcEstimatedFreeAt(Reservation $reservation)
+{
+    $minutes = (int) ($reservation->expected_duration_minutes ?? 0);
+    if ($minutes <= 0) $minutes = 90;
+    $minutes = max(15, min($minutes, 300));
+
+    $base = $reservation->seated_at
+        ?? $reservation->reservation_time
+        ?? now();
+
+    return $base->copy()->addMinutes($minutes);
+}
+
+
 }

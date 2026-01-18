@@ -7,11 +7,18 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Customer extends Model
 {
-    protected $fillable = ['name', 'phone', 'email', 'is_active'];
+    protected $fillable = ['name', 'phone', 'email', 'password', 'is_active'];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'password' => 'hashed',
     ];
+
+    protected $hidden = [
+    'password',
+];
+
+    
 
     public function reservations(): HasMany
     {

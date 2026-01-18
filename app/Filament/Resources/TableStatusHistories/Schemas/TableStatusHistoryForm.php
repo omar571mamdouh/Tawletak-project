@@ -29,7 +29,7 @@ class TableStatusHistoryForm
 
                             Select::make('changed_by_staff_id')
                                 ->label(__('Changed By Staff'))
-                                ->relationship('changedByStaff', 'name')
+                                ->relationship('changedBy', 'name')
                                 ->searchable()
                                 ->preload()
                                 ->nullable()

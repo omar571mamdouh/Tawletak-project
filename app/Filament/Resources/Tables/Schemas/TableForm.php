@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Tables\Schemas;
 
+use App\Models\Restaurant;
+use App\Models\RestaurantBranch;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -19,13 +21,58 @@ class TableForm
                     ->description(__('Basic details about the table'))
                     ->schema([
                         Grid::make(2)->schema([
+
+                            // ✅ Restaurant first (UI only - not saved)
+                            Select::make('restaurant_id')
+                                ->label(__('Restaurant'))
+                                ->options(fn () => Restaurant::query()->orderBy('name')->pluck('name', 'id'))
+                                ->searchable()
+                                ->required()
+                                ->reactive()
+                                ->dehydrated(false) // 👈 مش هيتخزن في DB
+                                ->afterStateHydrated(function (callable $set, callable $get) {
+                                    // ✅ في الـ Edit: جبلي restaurant_id من branch_id
+                                    $branchId = $get('branch_id');
+                                    if (! $branchId) return;
+
+                                    $restaurantId = RestaurantBranch::whereKey($branchId)->value('restaurant_id');
+                                    if ($restaurantId) {
+                                        $set('restaurant_id', $restaurantId);
+                                    }
+                                })
+                                ->afterStateUpdated(function (callable $set) {
+                                    // لما المطعم يتغير امسح البرانش
+                                    $set('branch_id', null);
+                                }),
+
+                            // ✅ Branch filtered by selected restaurant
                             Select::make('branch_id')
                                 ->label(__('Branch'))
-                                ->relationship('branch', 'name')
+                                ->options(function (callable $get) {
+                                    $restaurantId = $get('restaurant_id');
+                                    if (! $restaurantId) return [];
+
+                                    return RestaurantBranch::query()
+                                        ->where('restaurant_id', $restaurantId)
+                                        ->orderBy('name')
+                                        ->pluck('name', 'id');
+                                })
                                 ->searchable()
-                                ->preload()
                                 ->required()
-                                ->placeholder(__('Select branch')),
+                                ->placeholder(__('Select branch'))
+                                ->disabled(function (callable $get) {
+                                    $restaurantId = $get('restaurant_id');
+                                    if (! $restaurantId) return true;
+
+                                    return ! RestaurantBranch::where('restaurant_id', $restaurantId)->exists();
+                                })
+                                ->helperText(function (callable $get) {
+                                    $restaurantId = $get('restaurant_id');
+                                    if (! $restaurantId) return __('Select a restaurant first.');
+
+                                    $hasBranches = RestaurantBranch::where('restaurant_id', $restaurantId)->exists();
+                                    return $hasBranches ? null : __('No branches found for this restaurant.');
+                                }),
 
                             TextInput::make('table_code')
                                 ->label(__('Table Code'))

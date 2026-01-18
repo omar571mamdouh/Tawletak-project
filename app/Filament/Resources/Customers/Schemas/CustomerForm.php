@@ -43,8 +43,15 @@ class CustomerForm
                                 ->email()
                                 ->maxLength(255)
                                 ->unique(ignoreRecord: true)
-                                ->nullable(),
-
+                                ->required(),
+                            TextInput::make('password')
+                                ->label('Password')
+                                ->password()
+                                ->revealable()
+                                ->required(fn (string $operation) => $operation === 'create')
+                                ->minLength(8)
+                                ->placeholder('type your password')
+                                ->dehydrated(fn ($state) => filled($state)),
                             Toggle::make('is_active')
                                 ->label(__('Active'))
                                 ->default(true),

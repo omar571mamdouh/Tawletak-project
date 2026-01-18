@@ -16,9 +16,48 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use App\Filament\Resources\reservations\RelationManagers\EventsRelationManager;
-
+use App\Filament\Support\RoleGate as RG;
+use Illuminate\Database\Eloquent\Model;
 class ReservationResource extends Resource
 {
+public static function canViewAny(): bool
+{
+    return RG::isAny(['super_admin','owner','manager','staff']);
+}
+
+public static function canView(Model $record): bool
+{
+    return RG::isAny(['super_admin','owner','manager','staff']);
+}
+
+public static function canCreate(): bool
+{
+    return RG::isAny(['super_admin','owner','manager']);
+}
+
+public static function canEdit(Model $record): bool
+{
+    return RG::isAny(['super_admin','owner','manager']);
+}
+
+public static function canDelete(Model $record): bool
+{
+    return RG::isAny(['super_admin','owner']);
+}
+
+public static function canDeleteAny(): bool
+{
+    return RG::role() === 'super_admin';
+}
+public static function getNavigationBadge(): ?string
+{
+    return (string) Reservation::count();
+}
+
+public static function getNavigationBadgeColor(): ?string
+{
+    return 'success';
+}
     protected static ?string $model = Reservation::class;
 
     protected static string|\UnitEnum|null $navigationGroup = 'Reservation-Operations';

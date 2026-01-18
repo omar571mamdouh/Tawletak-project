@@ -9,16 +9,92 @@ use App\Filament\Resources\RestaurantStaff\Pages\ViewRestaurantStaff;
 use App\Filament\Resources\RestaurantStaff\Schemas\RestaurantStaffForm;
 use App\Filament\Resources\RestaurantStaff\Schemas\RestaurantStaffInfolist;
 use App\Filament\Resources\RestaurantStaff\Tables\RestaurantStaffTable;
-use App\Models\RestaurantStaff;
-use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+
 
 class RestaurantStaffResource extends Resource
 {
-    protected static ?string $model = RestaurantStaff::class;
+
+
+public static function canViewAny(): bool
+{
+    // مين يشوف الـ resource في الـ sidebar والـ list؟
+    return in_array(auth()->user()?->role, [
+        'super_admin',
+    ], true);
+}
+
+public static function canView(Model $record): bool
+{
+    // مين يفتح صفحة View لعنصر واحد؟
+    return in_array(auth()->user()?->role, [
+        'super_admin',
+      
+    ], true);
+}
+
+public static function canCreate(): bool
+{
+    // مين يقدر يعمل Create؟
+    return in_array(auth()->user()?->role, [
+        'super_admin',
+      
+    ], true);
+}
+
+public static function canEdit(Model $record): bool
+{
+    // مين يقدر يعمل Edit؟
+    return in_array(auth()->user()?->role, [
+        'super_admin',
+       
+    ], true);
+}
+
+public static function canDelete(Model $record): bool
+{
+    // مين يقدر يحذف Record واحد؟
+    return in_array(auth()->user()?->role, [
+        'super_admin',
+       
+    ], true);
+}
+
+public static function canDeleteAny(): bool
+{
+    // مين يقدر يعمل Bulk Delete؟
+    return auth()->user()?->role === 'super_admin';
+}
+
+public static function getNavigationBadge(): ?string
+{
+    return (string) User::query()
+        ->whereIn('role', ['owner', 'manager', 'staff'])
+        ->count();
+}
+
+public static function getNavigationBadgeColor(): ?string
+{
+    return 'success';
+}
+    
+public static function getEloquentQuery(): Builder
+{
+    return parent::getEloquentQuery()
+        ->whereIn('role', ['owner', 'manager', 'staff']);
+}
+protected static ?string $model =  User::class;
+
+
+protected static ?string $navigationLabel = 'Restaurant Staff';
+protected static ?string $modelLabel = 'Staff Member';
+protected static ?string $pluralModelLabel = 'Restaurant Staff';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Restaurant-Operations';
 

@@ -4,6 +4,8 @@ namespace App\Observers;
 
 use App\Models\TableStatus;
 use App\Models\TableStatusHistory;
+use Illuminate\Support\Facades\Auth;
+
 
 class TableStatusObserver
 {
@@ -16,7 +18,7 @@ class TableStatusObserver
 
         TableStatusHistory::create([
             'table_id'            => $status->table_id,
-            'changed_by_staff_id' => null, // لحد ما نربط staff auth
+            'changed_by_user_id' => Auth::id(), // لحد ما نربط staff auth
             'old_status'          => $status->getOriginal('status'),
             'new_status'          => $status->status,
             'timestamp'           => now(),

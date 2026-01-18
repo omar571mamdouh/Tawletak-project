@@ -10,6 +10,13 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
+use App\Services\NotificationService;
+use App\Enums\NotificationType;
+use Illuminate\Support\Facades\Auth;
+use Filament\Facades\Filament;
+
+
+
 
 
 class ReservationsTable
@@ -70,15 +77,51 @@ Action::make('seat_now')
     ->label(__('Seat'))
     ->icon('heroicon-o-user-group')
     ->color('warning')
-    ->visible(fn ($record) => $record->status === 'confirmed' && blank($record->seated_at) && blank($record->cancelled_at))
+    ->visible(fn ($record) =>
+        $record->status === 'confirmed'
+        && blank($record->seated_at)
+        && blank($record->cancelled_at)
+    )
     ->action(function ($record) {
+
+        // 1️⃣ تحديث الحجز
         $record->update([
             'status' => 'seated',
             'seated_at' => now(),
         ]);
 
-        Notification::make()->title(__('Seated'))->success()->send();
+        // 2️⃣ Toast داخل Filament
+        \Filament\Notifications\Notification::make()
+            ->title(__('Seated'))
+            ->success()
+            ->send();
+
+        // 3️⃣ هات الأدمن اللي مسجل دلوقتي (Filament session)
+        $adminId = \Filament\Facades\Filament::auth()->id();
+
+        if (!$adminId) {
+            \Log::warning('No admin found for notification', [
+                'reservation_id' => $record->id,
+            ]);
+            return;
+        }
+
+        // 4️⃣ ابعت Notification + Push لنفس الأدمن
+        NotificationService::notifyAdmin(
+            adminId: (int) $adminId,
+            type: NotificationType::SystemAlert,
+            title: 'Reservation Seated',
+            message: "Reservation #{$record->id} has been seated.",
+            data: [
+                'reservation_id' => (string) $record->id,
+                'status' => 'seated',
+                'url' => "/admin/reservations/{$record->id}/edit",
+            ],
+            sendPush: true
+        );
     }),
+
+
 
 Action::make('complete_now')
     ->label(__('Complete'))

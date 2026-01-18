@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\User;
 
 class TableStatusHistory extends Model
 {
@@ -11,7 +12,7 @@ class TableStatusHistory extends Model
 
     protected $fillable = [
         'table_id',
-        'changed_by_staff_id',
+        'changed_by_user_id',
         'old_status',
         'new_status',
         'timestamp',
@@ -27,8 +28,9 @@ class TableStatusHistory extends Model
         return $this->belongsTo(Table::class, 'table_id');
     }
 
-    public function changedByStaff(): BelongsTo
-    {
-        return $this->belongsTo(RestaurantStaff::class, 'changed_by_staff_id');
-    }
+    public function changedBy(): BelongsTo
+{
+    return $this->belongsTo(User::class, 'changed_by_user_id');
+}
+
 }

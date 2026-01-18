@@ -55,6 +55,11 @@ return [
             'driver' => 'sanctum',
             'provider' => 'restaurant_staff',
     ],
+
+     'staff_web' => [ // Filament
+        'driver' => 'session',
+        'provider' => 'restaurant_staff',
+    ],
     ],
 
     /*

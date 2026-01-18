@@ -17,8 +17,11 @@ class TableStatusHistoriesTable
             ->columns([
                 TextColumn::make('table.id')
                     ->searchable(),
-                TextColumn::make('changedByStaff.name')
-                    ->searchable(),
+                TextColumn::make('changedBy.name')
+    ->label('Changed by staff')
+    ->default('-')
+    ->searchable(),
+
                 TextColumn::make('old_status')
                     ->badge(),
                 TextColumn::make('new_status')

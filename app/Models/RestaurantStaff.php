@@ -27,11 +27,11 @@ class RestaurantStaff extends Authenticatable
 
     protected $casts = [
         'is_active' => 'boolean',
+        'password_hash' => 'hashed',
     ];
 
     protected $hidden = [
     'password_hash',
-    'remember_token',
 ];
 
 

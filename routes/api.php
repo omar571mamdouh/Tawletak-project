@@ -13,7 +13,8 @@ use App\Http\Controllers\Api\StaffAuthController;
 use App\Services\FcmService;
 use App\Services\NotificationService;
 use App\Enums\NotificationType;
-
+use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\Api\NotificationController;
 
 
 Route::get('/user', function (Request $request) {
@@ -32,7 +33,23 @@ Route::middleware('auth:sanctum')->group(function () {
 
      Route::post('/device-token', [DeviceTokenController::class, 'store']);
     Route::delete('/device-token', [DeviceTokenController::class, 'destroy']);
+    
 });
+
+Route::middleware('auth:customer')->group(function () {
+    Route::post('/customer/device-token', [DeviceTokenController::class, 'storeCustomer']);
+    Route::delete('/customer/device-token', [DeviceTokenController::class, 'destroyCustomer']);
+
+    Route::get('/notifications', function () {
+        $customer = Auth::guard('customer')->user();
+
+        return \App\Models\Notification::forCustomer($customer->id)
+            ->orderByDesc('sent_at')
+            ->get();
+    });
+});
+
+
 
 Route::get('customers', [CustomerController::class, 'index']);
 Route::get('customers/{customer}', [CustomerController::class, 'show']);
@@ -54,13 +71,8 @@ Route::post('reservations/{reservation}/cancel', [ReservationController::class, 
 Route::post('reservations/{reservation}/seat', [ReservationController::class, 'seat']);
 Route::post('reservations/{reservation}/complete', [ReservationController::class, 'complete']);
 
-Route::get('/notifications', function () {
-    $user = auth()->user();
 
-    return \App\Models\Notification::forCustomer($user->id)
-        ->orderByDesc('sent_at')
-        ->get();
-});
+
 
 Route::get('/test-fcm', function () {
     
@@ -88,4 +100,43 @@ Route::get('/test-fcm', function () {
             'error' => $e->getMessage()
         ], 500);
     }
+});
+
+Route::middleware('auth:sanctum')->group(function () {
+    
+    // Send notification to single customer
+    Route::post('/notifications/send-to-customer', [
+        \App\Http\Controllers\Api\NotificationController::class, 
+        'sendToCustomer'
+    ]);
+    
+    // Send notification to multiple customers
+    Route::post('/notifications/send-to-multiple-customers', [
+        \App\Http\Controllers\Api\NotificationController::class, 
+        'sendToMultipleCustomers'
+    ]);
+    
+    // Broadcast to all customers
+    Route::post('/notifications/broadcast-to-all-customers', [
+        \App\Http\Controllers\Api\NotificationController::class, 
+        'sendToAllCustomers'
+    ]);
+    
+    // Get customer notifications
+    Route::get('/notifications/customer/{customerId}', [
+        \App\Http\Controllers\Api\NotificationController::class, 
+        'getCustomerNotifications'
+    ]);
+    
+    // Mark notification as read
+    Route::post('/notifications/{notificationId}/mark-as-read', [
+        \App\Http\Controllers\Api\NotificationController::class, 
+        'markAsRead'
+    ]);
+    
+    // Get unread count
+    Route::get('/notifications/customer/{customerId}/unread-count', [
+        \App\Http\Controllers\Api\NotificationController::class, 
+        'getUnreadCount'
+    ]);
 });

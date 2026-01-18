@@ -3,10 +3,14 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Laravel\Sanctum\HasApiTokens;
 
-class Customer extends Model
+class Customer extends Authenticatable
 {
+     use HasApiTokens;
+
     protected $fillable = ['name', 'phone', 'email', 'password', 'is_active'];
 
     protected $casts = [
@@ -18,7 +22,6 @@ class Customer extends Model
     'password',
 ];
 
-    
 
     public function reservations(): HasMany
     {

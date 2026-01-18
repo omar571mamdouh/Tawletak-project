@@ -36,6 +36,10 @@ return [
     */
 
     'guards' => [
+        'customer' => [
+    'driver' => 'sanctum',
+    'provider' => 'customers',
+  ],
         'web' => [
             'driver' => 'session',
             'provider' => 'users',
@@ -90,6 +94,11 @@ return [
             'driver' => 'eloquent',
             'model' => App\Models\RestaurantStaff::class,
         ],
+
+         'customers' => [
+    'driver' => 'eloquent',
+    'model' => App\Models\Customer::class,
+  ],
 
         // 'users' => [
         //     'driver' => 'database',

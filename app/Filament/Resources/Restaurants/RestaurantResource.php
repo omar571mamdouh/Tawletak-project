@@ -17,6 +17,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use App\Filament\Resources\Restaurants\RelationManagers\BranchesRelationManager;
 use App\Filament\Resources\Restaurants\RelationManagers\StaffRelationManager;
+use App\Filament\Resources\Restaurants\RelationManagers\MenuSectionsRelationManager;
 use App\Filament\Support\RoleGate as RG;
 use Illuminate\Database\Eloquent\Model;
 class RestaurantResource extends Resource
@@ -91,6 +92,7 @@ public static function getNavigationBadgeColor(): ?string
         return [
             BranchesRelationManager::class,
             StaffRelationManager::class,
+            MenuSectionsRelationManager::class,
         ];
     }
 

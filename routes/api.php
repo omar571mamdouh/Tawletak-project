@@ -15,11 +15,51 @@ use App\Services\NotificationService;
 use App\Enums\NotificationType;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\PasswordController;
+use App\Http\Controllers\Api\CustomerAuthController;
+use App\Http\Controllers\Api\MenuController;
+use App\Http\Controllers\Api\CustomerProfileController;
+use App\Http\Controllers\Api\CustomerPreferencesController;
+use App\Http\Controllers\Api\CustomerNotificationController;
+use App\Http\Controllers\Api\SupportController;
+use App\Http\Controllers\Api\AppInfoController;
+use App\Http\Controllers\Api\RewardsController;
+use App\Http\Controllers\Api\LocationController;
+use App\Http\Controllers\Api\FavoriteController;
 
 
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
+Route::prefix('auth')->group(function () {
+
+    // SignUp
+    Route::post('register', [CustomerAuthController::class, 'register']);
+
+    // Login
+    Route::post('login', [CustomerAuthController::class, 'login']);
+
+    Route::post('logout', [CustomerAuthController::class, 'logout'])
+    ->middleware('auth:sanctum');
+
+
+    // Logout (Sanctum)
+
+    // Forgot Password -> send OTP
+    Route::post('forgot-password', [PasswordController::class, 'forgotPassword']);
+
+    // Verify Code (OTP)
+    Route::post('verify-otp', [PasswordController::class, 'verifyOtp']);
+
+    // Resend OTP
+    Route::post('resend-otp', [PasswordController::class, 'resendOtp']);
+
+    // New Password
+    Route::post('reset-password', [PasswordController::class, 'resetPassword']);
+});
+
+Route::get('/support/faqs', [SupportController::class, 'faqs']);
 
 Route::post('/staff/login', [StaffAuthController::class, 'login']);
 Route::middleware('auth:staff')->post('/staff/logout', [StaffAuthController::class, 'logout']);
@@ -63,6 +103,13 @@ Route::get('/offers/{offer}', [OfferController::class, 'show']);
 Route::apiResource('restaurants', RestaurantController::class);
 Route::get('restaurants/{restaurant}/branches', [RestaurantController::class, 'branches']);
 
+Route::prefix('restaurants')->group(function () {
+    // test endpoint: send menu in body and get normalized response
+    Route::post('{restaurant}/menu/preview', [MenuController::class, 'preview']);
+
+    // optional: same for highlights preview
+    Route::post('{restaurant}/menu/highlights/preview', [MenuController::class, 'highlightsPreview']);
+});
 // Reservations
 Route::apiResource('reservations', ReservationController::class);
 
@@ -72,7 +119,33 @@ Route::post('reservations/{reservation}/seat', [ReservationController::class, 's
 Route::post('reservations/{reservation}/complete', [ReservationController::class, 'complete']);
 
 
+Route::middleware(['auth:sanctum'])->group(function () {
+   Route::get('me/profile', [CustomerProfileController::class, 'show']);
+    Route::put('me/profile', [CustomerProfileController::class, 'update']);
+});
 
+    Route::get('location/search', [LocationController::class, 'search']);      // autocomplete
+    Route::get('location/reverse', [LocationController::class, 'reverse']);    // confirm pin
+
+    Route::middleware('auth:sanctum')->group(function () {
+    Route::get('favorites', [FavoriteController::class, 'index']);
+    Route::post('favorites', [FavoriteController::class, 'store']);
+    Route::delete('favorites/{restaurantId}', [FavoriteController::class, 'destroy']);
+});
+
+   
+
+    // Change Language / Preferences
+    Route::put('me/preferences', [CustomerPreferencesController::class, 'update']);
+
+    // Rewards (My Rewards)
+    Route::get('rewards', [RewardsController::class, 'index']);
+    Route::get('rewards/active', [RewardsController::class, 'active']);
+    Route::post('rewards/redeem', [RewardsController::class, 'redeem']);
+    Route::get('rewards/history', [RewardsController::class, 'history']);
+ 
+
+    Route::get('/app/about', [AppInfoController::class, 'about']);
 
 Route::get('/test-fcm', function () {
     

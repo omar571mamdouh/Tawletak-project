@@ -34,4 +34,15 @@ class Restaurant extends Model
     {
         return $this->hasMany(CustomerLoyalty::class, 'restaurant_id');
     }
+
+    public function menuSections()
+{
+    return $this->hasMany(MenuSection::class);
+}
+
+public function menuItems()
+{
+    return $this->hasMany(MenuItem::class);
+}
+
 }

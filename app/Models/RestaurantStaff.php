@@ -56,4 +56,40 @@ class RestaurantStaff extends Authenticatable
     return (string) $this->password_hash;
 }
 
+
+
+public function roleAssignment()
+{
+    return $this->hasOne(
+        RestaurantStaffRoleAssignment::class,
+        'staff_id'
+    );
+}
+
+public function role()
+{
+    return $this->hasOneThrough(
+        RestaurantRole::class,
+        RestaurantStaffRoleAssignment::class,
+        'staff_id',              // FK في assignments
+        'id',                    // PK في roles
+        'id',                    // PK في staff
+        'restaurant_role_id'     // FK في assignments
+    );
+}
+
+
+public function permissions()
+{
+    return $this->role
+        ? $this->role->permissions
+        : collect();
+}
+
+public function hasPermission(string $permissionKey): bool
+{
+    return $this->permissions()
+        ->contains('key', $permissionKey);
+}
+
 }

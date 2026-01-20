@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\TableController;
 use App\Http\Controllers\Api\OfferController;
 use App\Http\Controllers\Api\RestaurantController;
 use App\Http\Controllers\Api\MenuController;
+use App\Http\Controllers\Api\MenuItemController;
 
 use App\Http\Controllers\Api\AppReservationController;   // public reservations
 use App\Http\Controllers\Api\ReservationController;      // staff actions / management
@@ -26,6 +27,12 @@ use App\Http\Controllers\Api\CustomerPreferencesController;
 use App\Http\Controllers\Api\RewardsController;
 
 use App\Http\Controllers\Api\LocationController;
+use App\Http\Controllers\Api\LocationStaffController;
+
+
+use App\Http\Controllers\Api\Rbac\PermissionController;
+use App\Http\Controllers\Api\Rbac\RoleController;
+use App\Http\Controllers\Api\Rbac\StaffRoleController;
 
 /*
 |--------------------------------------------------------------------------
@@ -51,6 +58,15 @@ Route::prefix('restaurants/{restaurant}')->group(function () {
     Route::get('menu/sections', [MenuController::class, 'sections']);
     Route::get('menu/sections/{section}/items', [MenuController::class, 'sectionItems']);
     Route::get('menu/highlights', [MenuController::class, 'highlights']);
+
+     //  ADD menu item inside a section (scoped to restaurant)
+    Route::post('menu/sections/{section}/items', [MenuItemController::class, 'store']);
+
+    //  UPDATE menu item inside a section (scoped to restaurant)
+    Route::put('menu/sections/{section}/items/{item}', [MenuItemController::class, 'update']);
+
+    //  DELETE menu item from a section (scoped to restaurant)
+    Route::delete('menu/sections/{section}/items/{item}', [MenuItemController::class, 'destroy']);
 });
 
 /*
@@ -165,6 +181,51 @@ Route::middleware('auth:staff')->group(function () {
 
     // Staff Logout
     Route::post('staff/auth/logout', [StaffAuthController::class, 'logout']);
+
+    // ====== STAFF ME (اختبار + UI) ======
+    Route::get('staff/me', function () {
+        $staff = auth('staff')->user();
+
+        $assignment = \App\Models\RestaurantStaffRoleAssignment::with('role.permissions')
+            ->where('staff_id', $staff->id)
+            ->first();
+
+        return response()->json([
+            'data' => [
+                'id' => $staff->id,
+                'name' => $staff->name,
+                'email' => $staff->email,
+                'restaurant_id' => $staff->restaurant_id,
+                'role' => $assignment?->role?->name,
+                'permissions' => $assignment?->role?->permissions
+                    ?->pluck('key')
+                    ->values() ?? [],
+            ],
+        ]);
+    });
+
+    Route::prefix('staff/rbac')
+        ->middleware('staff.permission:rbac.manage')
+        ->group(function () {
+
+            // Permissions CRUD
+            Route::get('permissions', [PermissionController::class, 'index']);
+            Route::post('permissions', [PermissionController::class, 'store']);
+            Route::put('permissions/{permission}', [PermissionController::class, 'update']);
+            Route::delete('permissions/{permission}', [PermissionController::class, 'destroy']);
+
+            // Roles (داخل مطعم الـ staff الحالي)
+            Route::get('roles', [RoleController::class, 'index']);
+            Route::get('roles/{role}/permissions', [RoleController::class, 'showPermissions']);
+            Route::put('roles/{role}/permissions', [RoleController::class, 'syncPermissions']);
+
+            // Assign role to staff
+            Route::put('staff/{staff}/role', [StaffRoleController::class, 'assign']);
+        });
+
+
+    Route::put('staff/branch/location', [LocationStaffController::class,'locationAdd']);
+    Route::delete('staff/branch/location', [LocationStaffController::class,'destroy']);
 
     // Staff Reservations Management (Private)
     Route::apiResource('reservations', ReservationController::class);

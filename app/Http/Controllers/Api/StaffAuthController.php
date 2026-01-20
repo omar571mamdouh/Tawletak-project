@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers\Api;
+
 use App\Http\Controllers\Controller;
 use App\Models\RestaurantStaff;
 use Illuminate\Http\Request;
@@ -26,12 +27,54 @@ class StaffAuthController extends Controller
             ]);
         }
 
-        // (اختياري) امسح توكنات قديمة
-        // $staff->tokens()->delete();
-
         $token = $staff->createToken('staff-token')->plainTextToken;
 
         return response()->json([
+            'success' => true,
+            'message' => 'Login successful',
+            'data' => [
+                'token' => $token,
+                'staff' => [
+                    'id' => $staff->id,
+                    'name' => $staff->name,
+                    'email' => $staff->email,
+                    'role' => $staff->role,
+                    'restaurant_id' => $staff->restaurant_id,
+                    'branch_id' => $staff->branch_id,
+                ],
+            ],
+        ]);
+    }
+
+    public function register(Request $request)
+{
+    $data = $request->validate([
+        'restaurant_id' => ['required','integer'],
+        'branch_id'     => ['nullable','integer'],
+        'name'          => ['required','string','max:200'],
+        'phone'         => ['nullable','string','max:50'],
+        'email'         => ['nullable','email','max:200','unique:restaurant_staff,email'],
+        'password'      => ['required','string','min:8','confirmed'],
+        'role'          => ['required','in:owner,manager,staff'],
+    ]);
+
+    $staff = RestaurantStaff::create([
+        'restaurant_id' => $data['restaurant_id'],
+        'branch_id'     => $data['branch_id'] ?? null,
+        'name'          => $data['name'],
+        'phone'         => $data['phone'] ?? null,
+        'email'         => $data['email'] ?? null,
+        'password_hash' => Hash::make($data['password']),
+        'role'          => $data['role'],
+        'is_active'     => true,
+    ]);
+
+    $token = $staff->createToken('staff-token')->plainTextToken;
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Staff registered successfully',
+        'data' => [
             'token' => $token,
             'staff' => [
                 'id' => $staff->id,
@@ -41,15 +84,28 @@ class StaffAuthController extends Controller
                 'restaurant_id' => $staff->restaurant_id,
                 'branch_id' => $staff->branch_id,
             ],
-        ]);
+        ],
+    ], 201);
+}
+
+
+    public function logout(Request $request)
+{
+    $staff = auth('staff')->user();
+
+    if (!$staff) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthenticated (missing/invalid staff token)'
+        ], 401);
     }
 
-   public function logout(Request $request)
-{
-    $user = auth('staff')->user();
-    $user?->currentAccessToken()?->delete();
+    $staff->currentAccessToken()?->delete();
 
-    return response()->json(['message' => 'Logged out']);
+    return response()->json([
+        'success' => true,
+        'message' => 'Logged out'
+    ]);
 }
 
 }

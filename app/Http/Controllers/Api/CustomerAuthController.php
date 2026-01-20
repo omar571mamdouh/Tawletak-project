@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -13,25 +13,28 @@ class CustomerAuthController extends Controller
     public function register(Request $request)
     {
         $data = $request->validate([
-            'name' => ['required','string','max:255'],
-            'email' => ['required','email','max:255','unique:users,email'],
-            'password' => ['required','string','min:8','confirmed'],
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:customers,email'],
+            'phone' => ['required', 'string', 'max:20', 'unique:customers,phone'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        $user = User::create([
+        $customer = Customer::create([
             'name' => $data['name'],
             'email' => $data['email'],
-            'password' => Hash::make($data['password']),
+            'phone' => $data['phone'],
+            'password' => $data['password'], // ✅ مش محتاج Hash::make لأن عندك 'hashed' في casts
         ]);
 
-        $token = $user->createToken('mobile')->plainTextToken;
+        // ✅ Sanctum مبيحتاجش guard parameter
+        $token = $customer->createToken('mobile')->plainTextToken;
 
         return response()->json([
             'success' => true,
             'message' => 'Account created successfully',
             'data' => [
                 'token' => $token,
-                'user' => $user,
+                'customer' => $customer,
             ]
         ], 201);
     }
@@ -39,50 +42,49 @@ class CustomerAuthController extends Controller
     public function login(Request $request)
     {
         $data = $request->validate([
-            'email' => ['required','email'],
-            'password' => ['required','string'],
+            'email' => ['required', 'email'],
+            'password' => ['required', 'string'],
         ]);
 
-        $user = User::where('email', $data['email'])->first();
+        $customer = Customer::where('email', $data['email'])->first();
 
-        if (!$user || !Hash::check($data['password'], $user->password)) {
+        if (!$customer || !Hash::check($data['password'], $customer->password)) {
             throw ValidationException::withMessages([
                 'email' => ['Invalid credentials'],
             ]);
         }
 
-        // optional: revoke old tokens
-        // $user->tokens()->delete();
+        // ✅ Optional: امسح الـ tokens القديمة
+        // $customer->tokens()->delete();
 
-        $token = $user->createToken('mobile')->plainTextToken;
+        $token = $customer->createToken('mobile')->plainTextToken;
 
         return response()->json([
             'success' => true,
             'message' => 'Logged in successfully',
             'data' => [
                 'token' => $token,
-                'user' => $user,
+                'customer' => $customer,
             ]
         ]);
     }
 
    public function logout(Request $request)
 {
-    $user = $request->user();
+    $customer = $request->user(); // ✅ بدل user('customer')
 
-    if (!$user || !$user->currentAccessToken()) {
+    if (!$customer) {
         return response()->json([
             'success' => false,
             'message' => 'Unauthenticated'
         ], 401);
     }
 
-    $user->currentAccessToken()->delete();
+    $customer->currentAccessToken()->delete();
 
     return response()->json([
         'success' => true,
         'message' => 'Logged out successfully',
     ]);
 }
-
 }

@@ -2,27 +2,33 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Sanctum\HasApiTokens;
 
 class Customer extends Authenticatable
 {
-     use HasApiTokens;
+    use HasApiTokens;
 
-    protected $fillable = ['name', 'phone', 'email', 'password', 'is_active'];
+    protected $fillable = [
+        'name', 
+        'phone', 
+        'email', 
+        'password', 
+        'is_active'
+    ];
 
     protected $casts = [
         'is_active' => 'boolean',
-        'password' => 'hashed',
+        'password' => 'hashed', // ✅ Laravel 11+ automatic hashing
     ];
 
     protected $hidden = [
-    'password',
-];
+        'password',
+        'remember_token', // ✅ أضف ده كمان
+    ];
 
-
+    // Relations...
     public function reservations(): HasMany
     {
         return $this->hasMany(Reservation::class);

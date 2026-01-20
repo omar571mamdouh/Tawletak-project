@@ -36,9 +36,6 @@ class EventsRelationManager extends RelationManager
                 Select::make('actor_type')
                     ->options(['customer' => 'Customer', 'staff' => 'Staff', 'admin' => 'Admin', 'system' => 'System'])
                     ->default(null),
-                TextInput::make('actor_id')
-                    ->numeric()
-                    ->default(null),
                 Textarea::make('meta_json')
                     ->default(null)
                     ->columnSpanFull(),
@@ -55,9 +52,7 @@ class EventsRelationManager extends RelationManager
                 TextEntry::make('actor_type')
                     ->badge()
                     ->placeholder('-'),
-                TextEntry::make('actor_id')
-                    ->numeric()
-                    ->placeholder('-'),
+               
                 TextEntry::make('meta_json')
                     ->placeholder('-')
                     ->columnSpanFull(),

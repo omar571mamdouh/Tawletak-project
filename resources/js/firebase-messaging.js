@@ -272,5 +272,3 @@ function showToastNotification(title, body) {
     
     // TODO: Replace with your toast notification library
 }
-
-initFirebaseMessaging?.().then(t => console.log("🎯 token:", t));

@@ -17,7 +17,7 @@ class LoyaltiesRelationManager extends RelationManager
     {
         return $table
             ->headerActions([
-                CreateAction::make(),
+                
             ]);
     }
 }

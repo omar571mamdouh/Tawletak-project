@@ -34,7 +34,8 @@ return [
     |
     */
 
-    'guard' => ['web', 'api', 'staff'],
+    'guard' => ['web'],
+
 
 
     /*

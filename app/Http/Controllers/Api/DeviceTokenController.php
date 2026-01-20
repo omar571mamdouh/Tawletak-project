@@ -105,53 +105,36 @@ class DeviceTokenController extends Controller
      * Store FCM device token (Customer - Mobile)
      */
     public function storeCustomer(Request $request)
-    {
-        $data = $request->validate([
-            'token'    => 'required|string|max:512',
-            'platform' => 'nullable|string|max:20',
-        ]);
+{
+    $data = $request->validate([
+        'token'    => 'required|string|max:512',
+        'platform' => 'nullable|string|max:20',
+    ]);
 
-        $customer = Auth::guard('customer')->user();
+    $customer = $request->user(); // ✅ Sanctum
 
-        if (!$customer) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthenticated',
-            ], 401);
-        }
-
-        $existing = DeviceToken::where('token', $data['token'])->first();
-
-        $deviceToken = DeviceToken::updateOrCreate(
-            ['token' => $data['token']],
-            [
-                'owner_type' => 'customer',
-                'owner_id'   => $customer->id,
-                'platform'   => $data['platform'] ?? 'mobile',
-            ]
-        );
-
-        // لو التوكن كان مملوك لحد تاني قبل كده (مثلاً Admin أو Customer آخر)
-        if ($existing && ($existing->owner_type !== 'customer' || (int) $existing->owner_id !== (int) $customer->id)) {
-            Log::info('FCM token ownership transferred (customer)', [
-                'token'     => substr($data['token'], 0, 20) . '...',
-                'from_type' => $existing->owner_type,
-                'from_id'   => $existing->owner_id,
-                'to_type'   => 'customer',
-                'to_id'     => $customer->id,
-            ]);
-        }
-
+    if (!$customer || !($customer instanceof \App\Models\Customer)) {
         return response()->json([
-            'success' => true,
-            'message' => 'Device token saved successfully',
-            'data' => [
-                'id'       => $deviceToken->id,
-                'owner_id' => $deviceToken->owner_id,
-                'platform' => $deviceToken->platform,
-            ],
-        ]);
+            'success' => false,
+            'message' => 'Unauthenticated',
+        ], 401);
     }
+
+    $deviceToken = \App\Models\DeviceToken::updateOrCreate(
+        ['token' => $data['token']],
+        [
+            'owner_type' => 'customer',
+            'owner_id'   => $customer->id,
+            'platform'   => $data['platform'] ?? 'mobile',
+        ]
+    );
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Device token saved successfully',
+    ]);
+}
+
 
     /**
      * Remove FCM device token (Customer logout)

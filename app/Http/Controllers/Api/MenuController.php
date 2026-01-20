@@ -3,64 +3,36 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\MenuSection;
 use App\Models\Restaurant;
 use Illuminate\Http\Request;
 
 class MenuController extends Controller
 {
     /**
-     * POST /restaurants/{restaurant}/menu/preview
-     * Body contains categories/items, returns normalized grouped menu
+     * GET /restaurants/{restaurant}/menu/sections
+     * Query: include_items=1 (اختياري)
      */
-    public function preview(Request $request, Restaurant $restaurant)
+    public function sections(Request $request, Restaurant $restaurant)
     {
-        $data = $request->validate([
-            'currency' => ['nullable','string','max:10'],
-            'available_only' => ['nullable','boolean'],
-
-            'categories' => ['required','array','min:1'],
-            'categories.*.name' => ['required','string','max:100'],
-            'categories.*.items' => ['required','array'],
-
-            'categories.*.items.*.id' => ['nullable','integer'],
-            'categories.*.items.*.name' => ['required','string','max:150'],
-            'categories.*.items.*.description' => ['nullable','string','max:1000'],
-            'categories.*.items.*.price' => ['required','numeric','min:0'],
-            'categories.*.items.*.image' => ['nullable','string','max:2048'],
-            'categories.*.items.*.is_available' => ['nullable','boolean'],
-            'categories.*.items.*.is_featured' => ['nullable','boolean'],
-        ]);
-
-        $currency = $data['currency'] ?? 'JOD';
+        $includeItems = $request->boolean('include_items', false);
         $availableOnly = $request->boolean('available_only', true);
+        $currency = $request->get('currency', 'JOD');
 
-        // Normalize into grouped structure: { "Burgers": [..], "Chicken": [..] }
-        $grouped = [];
-        foreach ($data['categories'] as $cat) {
-            $catName = $cat['name'] ?? 'Others';
-            $items = $cat['items'] ?? [];
+        $query = $restaurant->menuSections()
+            ->where('is_active', true)
+            ->orderBy('sort_order');
 
-            $normalizedItems = [];
-            foreach ($items as $i) {
-                $isAvailable = array_key_exists('is_available', $i) ? (bool)$i['is_available'] : true;
-                if ($availableOnly && !$isAvailable) {
-                    continue;
+        if ($includeItems) {
+            $query->with(['items' => function ($q) use ($availableOnly) {
+                if ($availableOnly) {
+                    $q->where('is_available', true);
                 }
-
-                $normalizedItems[] = [
-                    'id' => $i['id'] ?? null,
-                    'name' => $i['name'],
-                    'description' => $i['description'] ?? null,
-                    'price' => (float) $i['price'],
-                    'currency' => $currency,
-                    'image' => $i['image'] ?? null,
-                    'is_available' => $isAvailable,
-                    'is_featured' => array_key_exists('is_featured', $i) ? (bool)$i['is_featured'] : false,
-                ];
-            }
-
-            $grouped[$catName] = $normalizedItems;
+                $q->orderBy('sort_order');
+            }]);
         }
+
+        $sections = $query->get();
 
         return response()->json([
             'success' => true,
@@ -69,64 +41,114 @@ class MenuController extends Controller
                     'id' => $restaurant->id,
                     'name' => $restaurant->name,
                 ],
-                'menu' => $grouped,
+                'sections' => $sections->map(function ($section) use ($includeItems, $currency) {
+                    $payload = [
+                        'id' => $section->id,
+                        'name' => $section->name,
+                        'sort_order' => (int) $section->sort_order,
+                        'is_active' => (bool) $section->is_active,
+                    ];
+
+                    if ($includeItems) {
+                        $payload['items'] = $section->items->map(function ($item) use ($currency) {
+                            return [
+                                'id' => $item->id,
+                                'name' => $item->name,
+                                'description' => $item->description,
+                                'price' => (float) $item->price,
+                                'currency' => $currency,
+                                'image' => $item->image,
+                                'is_available' => (bool) $item->is_available,
+                                'is_featured' => (bool) $item->is_featured,
+                                'sort_order' => (int) $item->sort_order,
+                            ];
+                        })->values();
+                    }
+
+                    return $payload;
+                })->values(),
             ],
         ]);
     }
 
     /**
-     * POST /restaurants/{restaurant}/menu/highlights/preview
-     * Returns only featured items from the same body format
+     * GET /restaurants/{restaurant}/menu/sections/{section}/items
      */
-    public function highlightsPreview(Request $request, Restaurant $restaurant)
+    public function sectionItems(Request $request, Restaurant $restaurant, MenuSection $section)
     {
-        $data = $request->validate([
-            'currency' => ['nullable','string','max:10'],
-            'limit' => ['nullable','integer','min:1','max:50'],
-
-            'categories' => ['required','array','min:1'],
-            'categories.*.items' => ['required','array'],
-
-            'categories.*.items.*.id' => ['nullable','integer'],
-            'categories.*.items.*.name' => ['required','string','max:150'],
-            'categories.*.items.*.description' => ['nullable','string','max:1000'],
-            'categories.*.items.*.price' => ['required','numeric','min:0'],
-            'categories.*.items.*.image' => ['nullable','string','max:2048'],
-            'categories.*.items.*.is_available' => ['nullable','boolean'],
-            'categories.*.items.*.is_featured' => ['nullable','boolean'],
-        ]);
-
-        $currency = $data['currency'] ?? 'JOD';
-        $limit = $data['limit'] ?? 6;
-
-        $highlights = [];
-
-        foreach ($data['categories'] as $cat) {
-            foreach ($cat['items'] as $i) {
-                $isAvailable = array_key_exists('is_available', $i) ? (bool)$i['is_available'] : true;
-                $isFeatured = array_key_exists('is_featured', $i) ? (bool)$i['is_featured'] : false;
-
-                if (!$isAvailable || !$isFeatured) continue;
-
-                $highlights[] = [
-                    'id' => $i['id'] ?? null,
-                    'name' => $i['name'],
-                    'description' => $i['description'] ?? null,
-                    'price' => (float) $i['price'],
-                    'currency' => $currency,
-                    'image' => $i['image'] ?? null,
-                ];
-
-                if (count($highlights) >= $limit) break 2;
-            }
+        // تأمين: لازم السيكشن يتبع نفس المطعم
+        if ((int) $section->restaurant_id !== (int) $restaurant->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Section does not belong to this restaurant.',
+            ], 404);
         }
+
+        $availableOnly = $request->boolean('available_only', true);
+        $currency = $request->get('currency', 'JOD');
+
+        $itemsQuery = $section->items()->orderBy('sort_order');
+        if ($availableOnly) {
+            $itemsQuery->where('is_available', true);
+        }
+
+        $items = $itemsQuery->get();
 
         return response()->json([
             'success' => true,
             'data' => [
                 'restaurant_id' => $restaurant->id,
-                'highlights' => $highlights
-            ]
+                'section' => [
+                    'id' => $section->id,
+                    'name' => $section->name,
+                ],
+                'items' => $items->map(function ($item) use ($currency) {
+                    return [
+                        'id' => $item->id,
+                        'name' => $item->name,
+                        'description' => $item->description,
+                        'price' => (float) $item->price,
+                        'currency' => $currency,
+                        'image' => $item->image,
+                        'is_available' => (bool) $item->is_available,
+                        'is_featured' => (bool) $item->is_featured,
+                        'sort_order' => (int) $item->sort_order,
+                    ];
+                })->values(),
+            ],
+        ]);
+    }
+
+    /**
+     * GET /restaurants/{restaurant}/menu/highlights
+     */
+    public function highlights(Request $request, Restaurant $restaurant)
+    {
+        $currency = $request->get('currency', 'JOD');
+        $limit = (int) $request->get('limit', 6);
+
+        $items = $restaurant->menuItems()
+            ->where('is_available', true)
+            ->where('is_featured', true)
+            ->orderBy('sort_order')
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'restaurant_id' => $restaurant->id,
+                'highlights' => $items->map(function ($item) use ($currency) {
+                    return [
+                        'id' => $item->id,
+                        'name' => $item->name,
+                        'description' => $item->description,
+                        'price' => (float) $item->price,
+                        'currency' => $currency,
+                        'image' => $item->image,
+                    ];
+                })->values(),
+            ],
         ]);
     }
 }

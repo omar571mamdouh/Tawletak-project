@@ -17,7 +17,7 @@ class WaitlistsRelationManager extends RelationManager
     {
         return $table
             ->headerActions([
-                CreateAction::make(),
+               
             ]);
     }
 }

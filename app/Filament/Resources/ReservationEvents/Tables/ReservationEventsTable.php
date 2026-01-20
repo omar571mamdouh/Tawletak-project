@@ -24,9 +24,6 @@ class ReservationEventsTable
                     ->sortable(),
                 TextColumn::make('actor_type')
                     ->badge(),
-                TextColumn::make('actor_id')
-                    ->numeric()
-                    ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

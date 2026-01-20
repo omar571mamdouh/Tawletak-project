@@ -24,9 +24,6 @@ class ReservationEventForm
                 Select::make('actor_type')
                     ->options(['customer' => 'Customer', 'staff' => 'Staff', 'admin' => 'Admin', 'system' => 'System'])
                     ->default(null),
-                TextInput::make('actor_id')
-                    ->numeric()
-                    ->default(null),
                 Textarea::make('meta_json')
                     ->default(null)
                     ->columnSpanFull(),

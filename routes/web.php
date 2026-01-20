@@ -9,7 +9,7 @@ Route::get('/', function () {
 
 
 
-Route::middleware(['web'])->group(function () {
-    Route::post('/device-token', [DeviceTokenController::class, 'store']);
-    Route::delete('/device-token', [DeviceTokenController::class, 'destroy']);
-});
+// Route::middleware(['web'])->group(function () {
+//     Route::post('/device-token', [DeviceTokenController::class, 'store']);
+//     Route::delete('/device-token', [DeviceTokenController::class, 'destroy']);
+// });

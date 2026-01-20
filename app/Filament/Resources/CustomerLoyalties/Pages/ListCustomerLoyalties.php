@@ -13,7 +13,7 @@ class ListCustomerLoyalties extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+         
         ];
     }
 }

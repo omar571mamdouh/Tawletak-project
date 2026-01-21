@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\AppInfoController;
 
 use App\Http\Controllers\Api\TableController;
+use App\Http\Controllers\Api\TableStatusController;
 use App\Http\Controllers\Api\OfferController;
 use App\Http\Controllers\Api\RestaurantController;
 use App\Http\Controllers\Api\MenuController;
@@ -69,16 +70,6 @@ Route::prefix('restaurants/{restaurant}')->group(function () {
     Route::delete('menu/sections/{section}/items/{item}', [MenuItemController::class, 'destroy']);
 });
 
-/*
-|--------------------------------------------------------------------------
-| Tables & Offers (Public - READ ONLY)
-|--------------------------------------------------------------------------
-*/
-Route::get('tables', [TableController::class, 'index']);
-Route::get('tables/{table}', [TableController::class, 'show']);
-
-Route::get('offers', [OfferController::class, 'index']);
-Route::get('offers/{offer}', [OfferController::class, 'show']);
 
 /*
 |--------------------------------------------------------------------------
@@ -226,6 +217,28 @@ Route::middleware('auth:staff')->group(function () {
 
     Route::put('staff/branch/location', [LocationStaffController::class,'locationAdd']);
     Route::delete('staff/branch/location', [LocationStaffController::class,'destroy']);
+
+    Route::get('staff/tables', [TableController::class, 'index']);
+    Route::get('staff/tables/{table}', [TableController::class, 'show']);
+    Route::post('staff/tables', [TableController::class, 'store']);
+    Route::put('staff/tables/{table}', [TableController::class, 'update']);   // أو PATCH
+    Route::delete('staff/tables/{table}', [TableController::class, 'destroy']);
+
+    // Table Status
+
+    Route::get('staff/table-status', [TableStatusController::class, 'index']);
+    Route::get('staff/tables/{table}/status', [TableStatusController::class, 'showByTable']);
+    Route::put('staff/tables/{table}/status', [TableStatusController::class, 'upsertByTable']);
+
+
+    Route::get('staff/offers', [OfferController::class, 'index']);
+    Route::get('staff/offers/{offer}', [OfferController::class, 'show']);
+
+    
+   Route::post('staff/offers', [OfferController::class, 'store']);
+   Route::put('staff/offers/{offer}', [OfferController::class, 'update']);
+   Route::delete('staff/offers/{offer}', [OfferController::class, 'destroy']);
+
 
     // Staff Reservations Management (Private)
     Route::apiResource('reservations', ReservationController::class);

@@ -22,16 +22,17 @@ class TableForm
                     ->schema([
                         Grid::make(2)->schema([
 
-                            // ✅ Restaurant first (UI only - not saved)
+                            // ✅ Restaurant (WILL be saved)
                             Select::make('restaurant_id')
                                 ->label(__('Restaurant'))
                                 ->options(fn () => Restaurant::query()->orderBy('name')->pluck('name', 'id'))
                                 ->searchable()
                                 ->required()
                                 ->reactive()
-                                ->dehydrated(false) // 👈 مش هيتخزن في DB
+                                // ✅ خليه يتخزن (امسح dehydrated(false))
+                                // ->dehydrated(true) // optional (default true)
                                 ->afterStateHydrated(function (callable $set, callable $get) {
-                                    // ✅ في الـ Edit: جبلي restaurant_id من branch_id
+                                    // في الـ Edit: جبلي restaurant_id من branch_id لو موجود
                                     $branchId = $get('branch_id');
                                     if (! $branchId) return;
 
@@ -60,6 +61,16 @@ class TableForm
                                 ->searchable()
                                 ->required()
                                 ->placeholder(__('Select branch'))
+                                ->reactive()
+                                ->afterStateUpdated(function ($state, callable $set) {
+                                    // ✅ لما الفرع يتحدد، ثبت restaurant_id تلقائيًا حسب الفرع
+                                    if (! $state) return;
+
+                                    $restaurantId = RestaurantBranch::whereKey($state)->value('restaurant_id');
+                                    if ($restaurantId) {
+                                        $set('restaurant_id', $restaurantId);
+                                    }
+                                })
                                 ->disabled(function (callable $get) {
                                     $restaurantId = $get('restaurant_id');
                                     if (! $restaurantId) return true;

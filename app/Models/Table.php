@@ -12,6 +12,7 @@ class Table extends Model
     protected $table = 'tables';
 
     protected $fillable = [
+        'restaurant_id',
         'branch_id',
         'table_code',
         'capacity',
@@ -57,4 +58,9 @@ class Table extends Model
     {
         return $this->hasMany(Visit::class, 'table_id');
     }
+
+    public function restaurant(): BelongsTo
+{
+    return $this->belongsTo(Restaurant::class, 'restaurant_id');
+}
 }

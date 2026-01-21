@@ -7,6 +7,10 @@ use App\Models\RestaurantStaff;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use App\Models\RestaurantRole;
+use App\Models\RestaurantStaffRoleAssignment;
+use Illuminate\Support\Facades\DB;
+
 
 class StaffAuthController extends Controller
 {
@@ -58,34 +62,57 @@ class StaffAuthController extends Controller
         'role'          => ['required','in:owner,manager,staff'],
     ]);
 
-    $staff = RestaurantStaff::create([
-        'restaurant_id' => $data['restaurant_id'],
-        'branch_id'     => $data['branch_id'] ?? null,
-        'name'          => $data['name'],
-        'phone'         => $data['phone'] ?? null,
-        'email'         => $data['email'] ?? null,
-        'password_hash' => Hash::make($data['password']),
-        'role'          => $data['role'],
-        'is_active'     => true,
-    ]);
+    return DB::transaction(function () use ($data) {
 
-    $token = $staff->createToken('staff-token')->plainTextToken;
+        $staff = RestaurantStaff::create([
+            'restaurant_id' => $data['restaurant_id'],
+            'branch_id'     => $data['branch_id'] ?? null,
+            'name'          => $data['name'],
+            'phone'         => $data['phone'] ?? null,
+            'email'         => $data['email'] ?? null,
+            'password_hash' => Hash::make($data['password']),
+            'role'          => $data['role'],
+            'is_active'     => true,
+        ]);
 
-    return response()->json([
-        'success' => true,
-        'message' => 'Staff registered successfully',
-        'data' => [
-            'token' => $token,
-            'staff' => [
-                'id' => $staff->id,
-                'name' => $staff->name,
-                'email' => $staff->email,
-                'role' => $staff->role,
+        // ✅ هات role record لنفس المطعم
+        $role = RestaurantRole::query()
+            ->where('restaurant_id', $staff->restaurant_id)
+            ->where('name', $staff->role) // owner/manager/staff
+            ->first();
+
+        // لو الدور مش موجود (احتياط)
+        if (!$role) {
+            $role = RestaurantRole::create([
                 'restaurant_id' => $staff->restaurant_id,
-                'branch_id' => $staff->branch_id,
+                'name' => $staff->role,
+            ]);
+        }
+
+        // ✅ اعمل assignment للستاف
+        RestaurantStaffRoleAssignment::updateOrCreate(
+            ['staff_id' => $staff->id],
+            ['restaurant_role_id' => $role->id]
+        );
+
+        $token = $staff->createToken('staff-token')->plainTextToken;
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Staff registered successfully',
+            'data' => [
+                'token' => $token,
+                'staff' => [
+                    'id' => $staff->id,
+                    'name' => $staff->name,
+                    'email' => $staff->email,
+                    'role' => $staff->role,
+                    'restaurant_id' => $staff->restaurant_id,
+                    'branch_id' => $staff->branch_id,
+                ],
             ],
-        ],
-    ], 201);
+        ], 201);
+    });
 }
 
 

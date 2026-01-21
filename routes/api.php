@@ -173,6 +173,18 @@ Route::middleware('auth:staff')->group(function () {
     // Staff Logout
     Route::post('staff/auth/logout', [StaffAuthController::class, 'logout']);
 
+
+
+    // Owner only
+    Route::middleware('owner')->group(function () {
+        Route::post('staff/rbac/roles', [RoleController::class, 'store']);
+        Route::put('staff/rbac/roles/{role}', [RoleController::class, 'update']);
+        Route::delete('staff/rbac/roles/{role}', [RoleController::class, 'destroy']);
+
+            // Assign role to staff
+            Route::put('staff/{staff}/role', [StaffRoleController::class, 'assign']);
+        });
+
     // ====== STAFF ME (اختبار + UI) ======
     Route::get('staff/me', function () {
         $staff = auth('staff')->user();
@@ -210,8 +222,6 @@ Route::middleware('auth:staff')->group(function () {
             Route::get('roles/{role}/permissions', [RoleController::class, 'showPermissions']);
             Route::put('roles/{role}/permissions', [RoleController::class, 'syncPermissions']);
 
-            // Assign role to staff
-            Route::put('staff/{staff}/role', [StaffRoleController::class, 'assign']);
         });
 
 

@@ -2,16 +2,18 @@
 
 namespace App\Filament\Resources\Reservations\Schemas;
 
+use App\Models\Restaurant;
+use App\Models\RestaurantBranch;
+use App\Models\Table;
+use Filament\Actions\Action;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Actions as SchemaActions;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Filament\Actions\Action;
-
-use Filament\Notifications\Notification;
-use Filament\Schemas\Components\Actions as SchemaActions;
 
 class ReservationForm
 {
@@ -31,20 +33,75 @@ class ReservationForm
                                 ->required()
                                 ->placeholder(__('Select customer')),
 
-                            Select::make('branch_id')
-                                ->label(__('Branch'))
-                                ->relationship('branch', 'name')
+                            // ✅ Restaurant (UI only)
+                            Select::make('restaurant_id')
+                                ->label(__('Restaurant'))
+                                ->options(fn () => Restaurant::query()->orderBy('name')->pluck('name', 'id'))
                                 ->searchable()
                                 ->preload()
                                 ->required()
-                                ->placeholder(__('Select branch')),
+                                ->reactive()
+                                ->dehydrated(false)
+                                ->afterStateHydrated(function (callable $set, callable $get) {
+                                    // في الـ Edit: استخرج restaurant_id من branch_id اللي متخزن في reservation
+                                    $branchId = $get('branch_id');
+                                    if (! $branchId) return;
 
+                                    $restaurantId = RestaurantBranch::whereKey($branchId)->value('restaurant_id');
+                                    if ($restaurantId) {
+                                        $set('restaurant_id', $restaurantId);
+                                    }
+                                })
+                                ->afterStateUpdated(function (callable $set) {
+                                    // لما المطعم يتغير امسح branch + table
+                                    $set('branch_id', null);
+                                    $set('table_id', null);
+                                }),
+
+                            // ✅ Branch filtered by restaurant
+                            Select::make('branch_id')
+                                ->label(__('Branch'))
+                                ->options(function (callable $get) {
+                                    $restaurantId = $get('restaurant_id');
+                                    if (! $restaurantId) return [];
+
+                                    return RestaurantBranch::query()
+                                        ->where('restaurant_id', $restaurantId)
+                                        ->orderBy('name')
+                                        ->pluck('name', 'id');
+                                })
+                                ->searchable()
+                                ->preload()
+                                ->required()
+                                ->reactive()
+                                ->placeholder(__('Select branch'))
+                                ->afterStateUpdated(function (callable $set) {
+                                    // لما الفرع يتغير امسح table
+                                    $set('table_id', null);
+                                }),
+
+                            // ✅ Tables filtered by restaurant + branch (IDs)
                             Select::make('table_id')
                                 ->label(__('Table'))
-                                ->relationship('table', 'id')
+                                ->options(function (callable $get) {
+                                    $restaurantId = $get('restaurant_id');
+                                    $branchId = $get('branch_id');
+                                    if (! $restaurantId || ! $branchId) return [];
+
+                                    return Table::query()
+                                        ->where('restaurant_id', $restaurantId)
+                                        ->where('branch_id', $branchId)
+                                        ->orderBy('table_code')
+                                        ->get()
+                                        ->mapWithKeys(fn (Table $t) => [
+                                            $t->id => "{$t->table_code} ({$t->capacity})"
+                                        ])
+                                        ->toArray();
+                                })
                                 ->searchable()
                                 ->preload()
                                 ->nullable()
+                                ->reactive()
                                 ->placeholder(__('Select table (optional)')),
                         ]),
 
@@ -106,147 +163,141 @@ class ReservationForm
                     ]),
 
                 Section::make(__('Timestamps'))
-    ->description(__('Track important reservation events'))
-    ->schema([
-        Grid::make(2)->schema([
-            SchemaActions::make([
-                Action::make('set_confirmed_now')
-                    ->label(__('Set Confirmed Now'))
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->visible(fn ($record) => filled($record) && blank($record->confirmed_at) && $record->status !== 'cancelled')
-                    ->action(function ($record) {
-                        $record->update([
-                            'status' => 'confirmed',
-                            'confirmed_at' => now(),
-                        ]);
+                    ->description(__('Track important reservation events'))
+                    ->schema([
+                        Grid::make(2)->schema([
+                            SchemaActions::make([
+                                Action::make('set_confirmed_now')
+                                    ->label(__('Set Confirmed Now'))
+                                    ->icon('heroicon-o-check-circle')
+                                    ->color('success')
+                                    ->visible(fn ($record) => filled($record) && blank($record->confirmed_at) && $record->status !== 'cancelled')
+                                    ->action(function ($record) {
+                                        $record->update([
+                                            'status' => 'confirmed',
+                                            'confirmed_at' => now(),
+                                        ]);
 
-                        Notification::make()->title(__('Confirmed timestamp set'))->success()->send();
-                    }),
+                                        Notification::make()->title(__('Confirmed timestamp set'))->success()->send();
+                                    }),
 
-                Action::make('clear_confirmed')
-                    ->label(__('Clear Confirmed'))
-                    ->icon('heroicon-o-arrow-path')
-                    ->color('gray')
-                    ->visible(fn ($record) => filled($record) && filled($record->confirmed_at))
-                    ->requiresConfirmation()
-                    ->action(function ($record) {
-                        $record->update([
-                            'confirmed_at' => null,
-                            // اختياري: رجّع status
-                            // 'status' => 'pending',
-                        ]);
+                                Action::make('clear_confirmed')
+                                    ->label(__('Clear Confirmed'))
+                                    ->icon('heroicon-o-arrow-path')
+                                    ->color('gray')
+                                    ->visible(fn ($record) => filled($record) && filled($record->confirmed_at))
+                                    ->requiresConfirmation()
+                                    ->action(function ($record) {
+                                        $record->update([
+                                            'confirmed_at' => null,
+                                        ]);
 
-                        Notification::make()->title(__('Confirmed timestamp cleared'))->success()->send();
-                    }),
-            ])->columns(1),
+                                        Notification::make()->title(__('Confirmed timestamp cleared'))->success()->send();
+                                    }),
+                            ])->columns(1),
 
-            SchemaActions::make([
-                Action::make('set_cancelled_now')
-                    ->label(__('Set Cancelled Now'))
-                    ->icon('heroicon-o-x-circle')
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->visible(fn ($record) => filled($record) && blank($record->cancelled_at) && $record->status !== 'completed')
-                    ->action(function ($record) {
-                        $record->update([
-                            'status' => 'cancelled',
-                            'cancelled_at' => now(),
-                        ]);
+                            SchemaActions::make([
+                                Action::make('set_cancelled_now')
+                                    ->label(__('Set Cancelled Now'))
+                                    ->icon('heroicon-o-x-circle')
+                                    ->color('danger')
+                                    ->requiresConfirmation()
+                                    ->visible(fn ($record) => filled($record) && blank($record->cancelled_at) && $record->status !== 'completed')
+                                    ->action(function ($record) {
+                                        $record->update([
+                                            'status' => 'cancelled',
+                                            'cancelled_at' => now(),
+                                        ]);
 
-                        Notification::make()->title(__('Cancelled timestamp set'))->danger()->send();
-                    }),
+                                        Notification::make()->title(__('Cancelled timestamp set'))->danger()->send();
+                                    }),
 
-                Action::make('clear_cancelled')
-                    ->label(__('Clear Cancelled'))
-                    ->icon('heroicon-o-arrow-path')
-                    ->color('gray')
-                    ->visible(fn ($record) => filled($record) && filled($record->cancelled_at))
-                    ->requiresConfirmation()
-                    ->action(function ($record) {
-                        $record->update([
-                            'cancelled_at' => null,
-                        ]);
+                                Action::make('clear_cancelled')
+                                    ->label(__('Clear Cancelled'))
+                                    ->icon('heroicon-o-arrow-path')
+                                    ->color('gray')
+                                    ->visible(fn ($record) => filled($record) && filled($record->cancelled_at))
+                                    ->requiresConfirmation()
+                                    ->action(function ($record) {
+                                        $record->update([
+                                            'cancelled_at' => null,
+                                        ]);
 
-                        Notification::make()->title(__('Cancelled timestamp cleared'))->success()->send();
-                    }),
-            ])->columns(1),
+                                        Notification::make()->title(__('Cancelled timestamp cleared'))->success()->send();
+                                    }),
+                            ])->columns(1),
 
-            SchemaActions::make([
-                Action::make('set_seated_now')
-                    ->label(__('Set Seated Now'))
-                    ->icon('heroicon-o-user-group')
-                    ->color('warning')
-                    ->visible(fn ($record) => filled($record)
-                        && blank($record->seated_at)
-                        && $record->status === 'confirmed'
-                        && blank($record->cancelled_at)
-                    )
-                    ->action(function ($record) {
-                        $record->update([
-                            'status' => 'seated',
-                            'seated_at' => now(),
-                        ]);
+                            SchemaActions::make([
+                                Action::make('set_seated_now')
+                                    ->label(__('Set Seated Now'))
+                                    ->icon('heroicon-o-user-group')
+                                    ->color('warning')
+                                    ->visible(fn ($record) => filled($record)
+                                        && blank($record->seated_at)
+                                        && $record->status === 'confirmed'
+                                        && blank($record->cancelled_at)
+                                    )
+                                    ->action(function ($record) {
+                                        $record->update([
+                                            'status' => 'seated',
+                                            'seated_at' => now(),
+                                        ]);
 
-                        Notification::make()->title(__('Seated timestamp set'))->success()->send();
-                    }),
+                                        Notification::make()->title(__('Seated timestamp set'))->success()->send();
+                                    }),
 
-                Action::make('clear_seated')
-                    ->label(__('Clear Seated'))
-                    ->icon('heroicon-o-arrow-path')
-                    ->color('gray')
-                    ->visible(fn ($record) => filled($record) && filled($record->seated_at))
-                    ->requiresConfirmation()
-                    ->action(function ($record) {
-                        $record->update([
-                            'seated_at' => null,
-                            // اختياري: رجّع status
-                            // 'status' => 'confirmed',
-                        ]);
+                                Action::make('clear_seated')
+                                    ->label(__('Clear Seated'))
+                                    ->icon('heroicon-o-arrow-path')
+                                    ->color('gray')
+                                    ->visible(fn ($record) => filled($record) && filled($record->seated_at))
+                                    ->requiresConfirmation()
+                                    ->action(function ($record) {
+                                        $record->update([
+                                            'seated_at' => null,
+                                        ]);
 
-                        Notification::make()->title(__('Seated timestamp cleared'))->success()->send();
-                    }),
-            ])->columns(1),
+                                        Notification::make()->title(__('Seated timestamp cleared'))->success()->send();
+                                    }),
+                            ])->columns(1),
 
-            SchemaActions::make([
-                Action::make('set_completed_now')
-                    ->label(__('Set Completed Now'))
-                    ->icon('heroicon-o-flag')
-                    ->color('gray')
-                    ->visible(fn ($record) => filled($record)
-                        && blank($record->completed_at)
-                        && $record->status === 'seated'
-                        && blank($record->cancelled_at)
-                    )
-                    ->action(function ($record) {
-                        $record->update([
-                            'status' => 'completed',
-                            'completed_at' => now(),
-                        ]);
+                            SchemaActions::make([
+                                Action::make('set_completed_now')
+                                    ->label(__('Set Completed Now'))
+                                    ->icon('heroicon-o-flag')
+                                    ->color('gray')
+                                    ->visible(fn ($record) => filled($record)
+                                        && blank($record->completed_at)
+                                        && $record->status === 'seated'
+                                        && blank($record->cancelled_at)
+                                    )
+                                    ->action(function ($record) {
+                                        $record->update([
+                                            'status' => 'completed',
+                                            'completed_at' => now(),
+                                        ]);
 
-                        Notification::make()->title(__('Completed timestamp set'))->success()->send();
-                    }),
+                                        Notification::make()->title(__('Completed timestamp set'))->success()->send();
+                                    }),
 
-                Action::make('clear_completed')
-                    ->label(__('Clear Completed'))
-                    ->icon('heroicon-o-arrow-path')
-                    ->color('gray')
-                    ->visible(fn ($record) => filled($record) && filled($record->completed_at))
-                    ->requiresConfirmation()
-                    ->action(function ($record) {
-                        $record->update([
-                            'completed_at' => null,
-                            // اختياري: رجّع status
-                            // 'status' => 'seated',
-                        ]);
+                                Action::make('clear_completed')
+                                    ->label(__('Clear Completed'))
+                                    ->icon('heroicon-o-arrow-path')
+                                    ->color('gray')
+                                    ->visible(fn ($record) => filled($record) && filled($record->completed_at))
+                                    ->requiresConfirmation()
+                                    ->action(function ($record) {
+                                        $record->update([
+                                            'completed_at' => null,
+                                        ]);
 
-                        Notification::make()->title(__('Completed timestamp cleared'))->success()->send();
-                    }),
-            ])->columns(1),
-        ]),
-    ])
-    ->collapsible()
-    ->collapsed(true),
+                                        Notification::make()->title(__('Completed timestamp cleared'))->success()->send();
+                                    }),
+                            ])->columns(1),
+                        ]),
+                    ])
+                    ->collapsible()
+                    ->collapsed(true),
             ]);
     }
 }

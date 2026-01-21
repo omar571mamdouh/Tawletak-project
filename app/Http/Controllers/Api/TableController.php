@@ -14,21 +14,9 @@ class TableController extends Controller
         return (int) auth('staff')->user()->restaurant_id;
     }
 
-    private function tableBelongsToStaffRestaurant(Table $table): bool
-    {
-        $restaurantId = $this->staffRestaurantId();
-
-        return Table::query()
-            ->whereKey($table->id)
-            ->whereHas('branch', fn ($q) => $q->where('restaurant_id', $restaurantId))
-            ->exists();
-    }
-
-    private function assertTableInStaffRestaurant(Table $table): void
-    {
-        abort_unless($this->tableBelongsToStaffRestaurant($table), 403, 'Forbidden (table not in your restaurant).');
-    }
-
+    /**
+     * Ensure given branch belongs to the authenticated staff restaurant.
+     */
     private function assertBranchInStaffRestaurant(int $branchId): void
     {
         $restaurantId = $this->staffRestaurantId();
@@ -41,15 +29,26 @@ class TableController extends Controller
         abort_unless($ok, 403, 'Forbidden (branch not in your restaurant).');
     }
 
+    /**
+     * Ensure given table belongs to the authenticated staff restaurant (by restaurant_id).
+     */
+    private function assertTableInStaffRestaurant(Table $table): void
+    {
+        $restaurantId = $this->staffRestaurantId();
+
+        abort_unless(
+            (int) $table->restaurant_id === $restaurantId,
+            403,
+            'Forbidden (table not in your restaurant).'
+        );
+    }
+
     public function index(Request $request)
     {
-        $perPage = min((int) $request->get('per_page', 20), 100);
-
         $restaurantId = $this->staffRestaurantId();
 
         $query = Table::query()
-            // ✅ أهم سطر: هات Tables الخاصة بمطعم الـ staff فقط
-            ->whereHas('branch', fn ($q) => $q->where('restaurant_id', $restaurantId))
+            ->where('restaurant_id', $restaurantId)
             ->with([
                 'status',
                 'statusHistory' => function ($q) use ($request) {
@@ -58,20 +57,25 @@ class TableController extends Controller
                 },
             ]);
 
-        // Filters (اختياري)
+        // Optional Filters
         if ($request->filled('branch_id')) {
-            // ✅ تأكد إن branch_id ده تبع نفس المطعم (عشان ما يفلترش على فرع مطعم تاني)
-            $this->assertBranchInStaffRestaurant((int) $request->branch_id);
-            $query->where('branch_id', $request->branch_id);
+            $branchId = (int) $request->branch_id;
+            $this->assertBranchInStaffRestaurant($branchId);
+            $query->where('branch_id', $branchId);
         }
 
         if ($request->filled('status')) {
-            $query->whereHas('status', fn ($q) => $q->where('status', $request->status));
+            $status = (string) $request->status;
+            $query->whereHas('status', fn ($q) => $q->where('status', $status));
         }
 
         if ($request->boolean('active_only')) {
             $query->where('is_active', true);
         }
+
+        // If you want pagination later:
+        // $perPage = min((int) $request->get('per_page', 20), 100);
+        // $tables = $query->paginate($perPage);
 
         $tables = $query->get();
 
@@ -83,7 +87,6 @@ class TableController extends Controller
 
     public function show(Table $table, Request $request)
     {
-        // ✅ امنع عرض Table مش تبع المطعم
         $this->assertTableInStaffRestaurant($table);
 
         $limit = min((int) $request->get('history_limit', 50), 200);
@@ -104,14 +107,18 @@ class TableController extends Controller
         $data = $request->validate([
             'branch_id'    => ['required', 'integer', 'exists:restaurant_branches,id'],
             'table_code'   => ['required', 'string', 'max:50'],
-            'capacity'     => ['required', 'integer', 'min:1', 'max:50'],
+            'capacity'     => ['required', 'integer', 'min:1', 'max:100'],
             'location_tag' => ['nullable', 'string', 'max:100'],
             'is_active'    => ['nullable', 'boolean'],
         ]);
 
-        // ✅ لازم الفرع يبقى تبع نفس المطعم
+        // Ensure branch belongs to same restaurant
         $this->assertBranchInStaffRestaurant((int) $data['branch_id']);
 
+        // Force restaurant_id from staff
+        $data['restaurant_id'] = $this->staffRestaurantId();
+
+        // Default active
         $data['is_active'] = $data['is_active'] ?? true;
 
         $table = Table::create($data);
@@ -127,23 +134,25 @@ class TableController extends Controller
 
     public function update(Request $request, Table $table)
     {
-        // ✅ لازم الطاولة تبع نفس المطعم
         $this->assertTableInStaffRestaurant($table);
 
         $data = $request->validate([
             'branch_id'    => ['sometimes', 'integer', 'exists:restaurant_branches,id'],
             'table_code'   => ['sometimes', 'string', 'max:50'],
-            'capacity'     => ['sometimes', 'integer', 'min:1', 'max:50'],
+            'capacity'     => ['sometimes', 'integer', 'min:1', 'max:100'],
             'location_tag' => ['sometimes', 'nullable', 'string', 'max:100'],
             'is_active'    => ['sometimes', 'boolean'],
         ]);
 
-        // ✅ لو هيغير branch_id لازم نتأكد الفرع الجديد تبع نفس المطعم
+        // If branch_id changed, ensure it belongs to same restaurant
         if (array_key_exists('branch_id', $data) && $data['branch_id'] !== null) {
             $this->assertBranchInStaffRestaurant((int) $data['branch_id']);
         }
 
-        // يمنع تمرير null بالغلط للأعمدة NOT NULL
+        // Force restaurant_id from staff (prevent tampering)
+        $data['restaurant_id'] = $this->staffRestaurantId();
+
+        // Prevent null overriding NOT NULL columns
         $data = array_filter($data, fn ($v) => !is_null($v));
 
         $table->update($data);
@@ -159,10 +168,9 @@ class TableController extends Controller
 
     public function destroy(Table $table)
     {
-        // ✅ لازم الطاولة تبع نفس المطعم
         $this->assertTableInStaffRestaurant($table);
 
-        // حماية من حذف طاولة عليها حجز شغال
+        // Prevent deleting table with active reservations (if relation exists)
         if (method_exists($table, 'reservations')) {
             $hasActiveReservation = $table->reservations()
                 ->whereIn('status', ['pending', 'confirmed', 'seated'])

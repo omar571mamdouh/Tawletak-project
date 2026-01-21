@@ -109,9 +109,9 @@ class LocationStaffController extends Controller
         }
 
         $branch->update([
-            'address' => null,
-            'lat' => null,
-            'lng' => null,
+            'address' => '',
+            'lat' => 0,
+            'lng' => 0,
         ]);
 
         return response()->json([

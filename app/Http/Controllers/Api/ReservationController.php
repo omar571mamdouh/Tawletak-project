@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ReservationResource;
 use App\Models\Reservation;
+use App\Models\Table;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -18,6 +19,9 @@ class ReservationController extends Controller
 
     public function index(Request $request)
 {
+
+$staffRestaurantId = auth('staff')->user()->restaurant_id;
+
     $with = ['customer', 'branch', 'table'];
 
     if ($request->boolean('include_events')) {
@@ -30,6 +34,8 @@ class ReservationController extends Controller
     }
 
     $q = Reservation::query()->with($with);
+
+    $q->whereHas('table', fn($query) => $query->where('restaurant_id', $staffRestaurantId));
 
     if ($request->filled('status')) {
         $q->where('status', $request->status);
@@ -74,6 +80,15 @@ class ReservationController extends Controller
         // default status لو مش مبعوت
         $data['status'] = $data['status'] ?? 'pending';
 
+
+        $staffRestaurantId = auth('staff')->user()->restaurant_id;
+
+$table = Table::findOrFail($data['table_id']);
+if ($table->restaurant_id != $staffRestaurantId) {
+    abort(403, 'Forbidden: table not in your restaurant.');
+}
+
+
         $reservation = Reservation::create($data);
         $reservation->load(['customer', 'branch', 'table']);
 
@@ -90,6 +105,10 @@ class ReservationController extends Controller
 
     public function update(Request $request, Reservation $reservation)
     {
+
+
+    $staffRestaurantId = auth('staff')->user()->restaurant_id;
+
         $data = $request->validate([
             'customer_id' => ['sometimes', 'required', 'exists:customers,id'],
             'branch_id'   => ['sometimes', 'required', 'exists:restaurant_branches,id'],
@@ -100,6 +119,15 @@ class ReservationController extends Controller
             'status'      => ['nullable', Rule::in($this->allowedStatuses())],
             'source'      => ['nullable', 'string', 'max:50'],
         ]);
+
+
+        if (isset($data['table_id'])) {
+    $table = Table::findOrFail($data['table_id']);
+    if ($table->restaurant_id != $staffRestaurantId) {
+        abort(403, 'Forbidden: table not in your restaurant.');
+    }
+}
+
 
         $reservation->update($data);
         $reservation->load(['customer', 'branch', 'table']);

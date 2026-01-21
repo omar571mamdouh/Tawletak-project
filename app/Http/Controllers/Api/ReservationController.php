@@ -37,6 +37,8 @@ $staffRestaurantId = auth('staff')->user()->restaurant_id;
 
     $q->whereHas('table', fn($query) => $query->where('restaurant_id', $staffRestaurantId));
 
+
+
     if ($request->filled('status')) {
         $q->where('status', $request->status);
     }

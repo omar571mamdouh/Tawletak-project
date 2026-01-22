@@ -22,7 +22,6 @@ class RestaurantStaff extends Authenticatable
         'phone',
         'email',
         'password_hash',
-        'role',
         'is_active',
     ];
 
@@ -66,23 +65,26 @@ public function roleAssignment()
     );
 }
 
-public function role()
+public function restaurantRole()
 {
     return $this->hasOneThrough(
-        RestaurantRole::class,
-        RestaurantStaffRoleAssignment::class,
-        'staff_id',              // FK في assignments
-        'id',                    // PK في roles
-        'id',                    // PK في staff
-        'restaurant_role_id'     // FK في assignments
+        \App\Models\RestaurantRole::class,
+        \App\Models\RestaurantStaffRoleAssignment::class,
+        'staff_id',            // FK on assignments referencing staff
+        'id',                  // PK on restaurant_roles
+        'id',                  // PK on restaurant_staff
+        'restaurant_role_id'   // FK on assignments referencing role
     );
 }
 
 
+/**
+ * ✅ permissions من خلال restaurantRole
+ */
 public function permissions()
 {
-    return $this->role
-        ? $this->role->permissions
+    return $this->restaurantRole
+        ? $this->restaurantRole->permissions
         : collect();
 }
 

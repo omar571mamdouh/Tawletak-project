@@ -18,4 +18,22 @@ class EditRestaurantStaff extends EditRecord
             DeleteAction::make(),
         ];
     }
+
+
+    protected function mutateFormDataBeforeFill(array $data): array
+{
+    $data['restaurant_role_id'] = $this->record->roleAssignment?->restaurant_role_id;
+    return $data;
+}
+
+protected function afterSave(): void
+{
+    $roleId = $this->data['restaurant_role_id'] ?? null;
+
+    $this->record->roleAssignment()->updateOrCreate(
+        ['staff_id' => $this->record->id],
+        ['restaurant_role_id' => $roleId]
+    );
+}
+
 }

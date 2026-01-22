@@ -16,11 +16,10 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 
+
 class RestaurantRoleResource extends Resource
 {
-
-
-
+    
 public static function getNavigationBadge(): ?string
 {
     return (string) RestaurantRole::count();

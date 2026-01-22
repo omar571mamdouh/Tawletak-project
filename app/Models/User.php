@@ -58,7 +58,6 @@ public function canAccessPanel(\Filament\Panel $panel): bool
      * Filament access control.
      * Allow only active super admins to access the admin panel.
      */
-   
 
     public function restaurant(): BelongsTo
 {
@@ -69,4 +68,22 @@ public function branch(): BelongsTo
 {
     return $this->belongsTo(\App\Models\RestaurantBranch::class, 'branch_id');
 }
+
+public function roles()
+{
+    return $this->belongsToMany(\App\Models\UserRole::class, 'user_roles_assignment', 'user_id', 'role_id');
+}
+
+public function hasRole(string $roleName): bool
+{
+    return $this->roles()->where('name', $roleName)->exists();
+}
+
+public function hasPermission(string $permissionName): bool
+{
+    return $this->roles()
+        ->whereHas('permissions', fn ($q) => $q->where('name', $permissionName))
+        ->exists();
+}
+
 }

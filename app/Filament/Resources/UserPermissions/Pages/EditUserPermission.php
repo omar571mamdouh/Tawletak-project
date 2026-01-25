@@ -15,7 +15,7 @@ class EditUserPermission extends EditRecord
     {
         return [
             ViewAction::make(),
-            DeleteAction::make(),
+           
         ];
     }
 }

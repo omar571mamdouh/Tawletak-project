@@ -21,6 +21,8 @@ class DatabaseSeeder extends Seeder
         ]);
  $this->call([RbacSeeder::class,
         ]);
+ $this->call([FilamentPermissionsSeeder::class,
+        ]);
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',

@@ -9,6 +9,7 @@ use App\Filament\Resources\UserPermissions\Pages\ViewUserPermission;
 use App\Filament\Resources\UserPermissions\Schemas\UserPermissionForm;
 use App\Filament\Resources\UserPermissions\Schemas\UserPermissionInfolist;
 use App\Filament\Resources\UserPermissions\Tables\UserPermissionsTable;
+use App\Filament\Resources\UserPermissions\Pages;
 use App\Models\UserPermission;
 use BackedEnum;
 use Filament\Resources\Resource;

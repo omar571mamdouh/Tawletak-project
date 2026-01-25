@@ -10,45 +10,82 @@ use Illuminate\Validation\ValidationException;
 use App\Models\RestaurantRole;
 use App\Models\RestaurantStaffRoleAssignment;
 use Illuminate\Support\Facades\DB;
+use App\Support\RestaurantStaffAudit;
 
 
 class StaffAuthController extends Controller
 {
     public function login(Request $request)
-    {
-        $request->validate([
-            'email' => ['required','email'],
-            'password' => ['required','string'],
-        ]);
+{
+    $request->validate([
+        'email' => ['required','email'],
+        'password' => ['required','string'],
+    ]);
 
-        $staff = RestaurantStaff::where('email', $request->email)
-            ->where('is_active', true)
-            ->first();
+    $staff = RestaurantStaff::where('email', $request->email)
+        ->where('is_active', true)
+        ->first();
 
-        if (!$staff || !Hash::check($request->password, $staff->password_hash)) {
-            throw ValidationException::withMessages([
-                'email' => ['Invalid credentials.'],
-            ]);
+    if (!$staff || !Hash::check($request->password, $staff->password_hash)) {
+
+        // (اختياري) log لفشل الدخول لو لقيت staff بالإيميل
+        if ($staff) {
+            RestaurantStaffAudit::logForStaff(
+                staff: $staff,
+                action: 'staff.auth.login_failed',
+                meta: [
+                    'email' => $request->input('email'),
+                    'device' => $request->header('X-Device-Id'),
+                    'app_version' => $request->header('X-App-Version'),
+                ],
+                statusCode: 422
+            );
         }
 
-        $token = $staff->createToken('staff-token')->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Login successful',
-            'data' => [
-                'token' => $token,
-                'staff' => [
-                    'id' => $staff->id,
-                    'name' => $staff->name,
-                    'email' => $staff->email,
-                    'role' => $staff->role,
-                    'restaurant_id' => $staff->restaurant_id,
-                    'branch_id' => $staff->branch_id,
-                ],
-            ],
+        throw ValidationException::withMessages([
+            'email' => ['Invalid credentials.'],
         ]);
     }
+
+    $token = $staff->createToken('staff-token')->plainTextToken;
+
+    // role من assignments (مش من column)
+    $assignment = RestaurantStaffRoleAssignment::with('role')
+        ->where('staff_id', $staff->id)
+        ->first();
+
+    // ✅ log نجاح الدخول
+    RestaurantStaffAudit::logForStaff(
+        staff: $staff,
+        action: 'staff.auth.login',
+        meta: [
+            'email' => $request->input('email'),
+            'device' => $request->header('X-Device-Id'),
+            'app_version' => $request->header('X-App-Version'),
+        ],
+        after: [
+            'staff_id' => $staff->id,
+            'role' => $assignment?->role?->name,
+        ],
+        statusCode: 200
+    );
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Login successful',
+        'data' => [
+            'token' => $token,
+            'staff' => [
+                'id' => $staff->id,
+                'name' => $staff->name,
+                'email' => $staff->email,
+                'role' => $assignment?->role?->name,
+                'restaurant_id' => $staff->restaurant_id,
+                'branch_id' => $staff->branch_id,
+            ],
+        ],
+    ]);
+}
 
     public function register(Request $request)
 {

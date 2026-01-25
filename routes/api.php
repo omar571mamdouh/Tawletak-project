@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\LocationStaffController;
 use App\Http\Controllers\Api\Rbac\PermissionController;
 use App\Http\Controllers\Api\Rbac\RoleController;
 use App\Http\Controllers\Api\Rbac\StaffRoleController;
+use App\Http\Controllers\Api\RestaurantStaffAuditLogController;
 
 /*
 |--------------------------------------------------------------------------
@@ -180,6 +181,8 @@ Route::middleware('auth:staff')->group(function () {
         Route::post('staff/rbac/roles', [RoleController::class, 'store']);
         Route::put('staff/rbac/roles/{role}', [RoleController::class, 'update']);
         Route::delete('staff/rbac/roles/{role}', [RoleController::class, 'destroy']);
+        Route::get('staff/audit-logs', [RestaurantStaffAuditLogController::class, 'index']);
+        Route::get('staff/audit-logs/{log}', [RestaurantStaffAuditLogController::class, 'show']);
 
             // Assign role to staff
             Route::put('staff/{staff}/role', [StaffRoleController::class, 'assign']);

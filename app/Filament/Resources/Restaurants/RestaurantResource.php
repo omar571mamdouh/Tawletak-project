@@ -20,38 +20,10 @@ use App\Filament\Resources\Restaurants\RelationManagers\StaffRelationManager;
 use App\Filament\Resources\Restaurants\RelationManagers\MenuSectionsRelationManager;
 use App\Filament\Support\RoleGate as RG;
 use Illuminate\Database\Eloquent\Model;
-class RestaurantResource extends Resource
-{
+use App\Filament\Resources\BaseResource;
 
-public static function canViewAny(): bool
+class RestaurantResource extends BaseResource
 {
-    return RG::isAny(['super_admin','owner','manager']);
-}
-
-public static function canView(Model $record): bool
-{
-    return RG::isAny(['super_admin','owner','manager']);
-}
-
-public static function canCreate(): bool
-{
-    return RG::isAny(['super_admin','owner','manager']);
-}
-
-public static function canEdit(Model $record): bool
-{
-    return RG::isAny(['super_admin','owner','manager']);
-}
-
-public static function canDelete(Model $record): bool
-{
-    return RG::isAny(['super_admin','owner']);
-}
-
-public static function canDeleteAny(): bool
-{
-    return RG::role() === 'super_admin';
-}
 
 public static function getNavigationBadge(): ?string
 {

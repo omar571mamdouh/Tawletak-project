@@ -18,38 +18,11 @@ use Filament\Tables\Table;
 use App\Filament\Resources\RestaurantBranches\RelationManagers\OffersRelationManager;
 use App\Filament\Support\RoleGate as RG;
 use Illuminate\Database\Eloquent\Model;
-class RestaurantBranchResource extends Resource
-{
-    public static function canViewAny(): bool
-{
-    return RG::isAny(['super_admin','owner']);
-}
+use App\Filament\Resources\BaseResource;
 
-public static function canView(Model $record): bool
+class RestaurantBranchResource extends BaseResource
 {
-    return RG::isAny(['super_admin','owner']);
-}
-
-public static function canCreate(): bool
-{
-    return RG::isAny(['super_admin','owner']);
-}
-
-public static function canEdit(Model $record): bool
-{
-    return RG::isAny(['super_admin','owner']);
-}
-
-public static function canDelete(Model $record): bool
-{
-    return RG::isAny(['super_admin','owner']);
-}
-
-public static function canDeleteAny(): bool
-{
-    return RG::role() === 'super_admin';
-}
-
+  
      public static function getNavigationBadge(): ?string
 {
     return (string) RestaurantBranch::count();

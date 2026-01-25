@@ -17,37 +17,11 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use App\Filament\Support\RoleGate as RG;
 use Illuminate\Database\Eloquent\Model;
-class TableStatusHistoryResource extends Resource
-{
-public static function canViewAny(): bool
-{
-    return RG::isAny(['super_admin','owner','manager']);
-}
+use App\Filament\Resources\BaseResource;
 
-public static function canView(Model $record): bool
+class TableStatusHistoryResource extends BaseResource
 {
-    return RG::isAny(['super_admin','owner','manager']);
-}
 
-public static function canCreate(): bool
-{
-    return RG::isAny(['super_admin','owner','manager']);
-}
-
-public static function canEdit(Model $record): bool
-{
-    return RG::isAny(['super_admin','owner','manager']);
-}
-
-public static function canDelete(Model $record): bool
-{
-    return RG::isAny(['super_admin','owner']);
-}
-
-public static function canDeleteAny(): bool
-{
-    return RG::role() === 'super_admin';
-}
 public static function getNavigationBadge(): ?string
 {
     return (string) TableStatusHistory::count();

@@ -15,8 +15,9 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use App\Filament\Resources\BaseResource;
 
-class MenuItemResource extends Resource
+class MenuItemResource extends BaseResource
 {
 
 public static function getNavigationBadge(): ?string

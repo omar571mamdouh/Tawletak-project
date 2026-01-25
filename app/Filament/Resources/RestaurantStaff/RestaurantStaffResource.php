@@ -16,8 +16,9 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use App\Filament\Resources\BaseResource;
 
-class RestaurantStaffResource extends Resource
+class RestaurantStaffResource extends BaseResource
 {
     protected static ?string $model = RestaurantStaff::class;
 
@@ -30,37 +31,6 @@ class RestaurantStaffResource extends Resource
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedUserGroup;
 
     protected static ?string $recordTitleAttribute = 'name';
-
-    // ====== Authorization (admin users) ======
-    public static function canViewAny(): bool
-    {
-        return auth()->user()?->role === 'super_admin';
-    }
-
-    public static function canView(Model $record): bool
-    {
-        return auth()->user()?->role === 'super_admin';
-    }
-
-    public static function canCreate(): bool
-    {
-        return auth()->user()?->role === 'super_admin';
-    }
-
-    public static function canEdit(Model $record): bool
-    {
-        return auth()->user()?->role === 'super_admin';
-    }
-
-    public static function canDelete(Model $record): bool
-    {
-        return auth()->user()?->role === 'super_admin';
-    }
-
-    public static function canDeleteAny(): bool
-    {
-        return auth()->user()?->role === 'super_admin';
-    }
 
     // ====== Navigation badge ======
     public static function getNavigationBadge(): ?string

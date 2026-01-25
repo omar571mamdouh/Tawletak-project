@@ -21,39 +21,10 @@ use App\Filament\Resources\Customers\RelationManagers\LoyaltiesRelationManager;
 use App\Filament\Resources\Customers\RelationManagers\OfferRedemptionsRelationManager;
 use App\Filament\Support\RoleGate as RG;
 use Illuminate\Database\Eloquent\Model;
+use App\Filament\Resources\BaseResource;
 
-class CustomerResource extends Resource
+class CustomerResource extends BaseResource
 {
-
-public static function canViewAny(): bool
-{
-    return RG::isAny(['super_admin','owner','manager','staff']);
-}
-
-public static function canView(Model $record): bool
-{
-    return RG::isAny(['super_admin','owner','manager','staff']);
-}
-
-public static function canCreate(): bool
-{
-    return RG::isAny(['super_admin','owner','manager']);
-}
-
-public static function canEdit(Model $record): bool
-{
-    return RG::isAny(['super_admin','owner','manager']);
-}
-
-public static function canDelete(Model $record): bool
-{
-    return RG::isAny(['super_admin','owner']);
-}
-
-public static function canDeleteAny(): bool
-{
-    return RG::role() === 'super_admin';
-}
     public static function getNavigationBadge(): ?string
 {
     return (string) Customer::count();

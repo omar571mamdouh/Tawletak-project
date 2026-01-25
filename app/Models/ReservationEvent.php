@@ -5,9 +5,24 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
+
 
 class ReservationEvent extends Model
 {
+
+    use LogsActivity;
+
+    public function getActivitylogOptions(): LogOptions
+{
+    return LogOptions::defaults()
+        ->useLogName('reservations-events') 
+        ->logOnly(['reservation_id', 'event_time','event_type'])
+        ->logOnlyDirty()
+        ->dontSubmitEmptyLogs();
+}
+
     protected $fillable = [
         'reservation_id',
         'event_type',

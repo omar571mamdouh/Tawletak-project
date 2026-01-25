@@ -4,9 +4,22 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class OfferRedemption extends Model
 {
+
+use LogsActivity;
+
+  public function getActivitylogOptions(): LogOptions
+{
+    return LogOptions::defaults()
+        ->useLogName('Offer-redemption') // اسم واضح
+        ->logAll()
+        ->logOnlyDirty()
+        ->dontSubmitEmptyLogs();
+}
     protected $fillable = [
         'offer_id',
         'customer_id',

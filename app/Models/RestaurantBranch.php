@@ -5,9 +5,23 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class RestaurantBranch extends Model
 {
+
+use LogsActivity;
+
+ public function getActivitylogOptions(): LogOptions
+{
+    return LogOptions::defaults()
+        ->useLogName('restaurant-branch') 
+        ->logOnly([ 'restaurant_id','name','address','lat','lng', 'opening_time','closing_time',])
+        ->logOnlyDirty()
+        ->dontSubmitEmptyLogs();
+}
+
     protected $table = 'restaurant_branches';
 
     protected $fillable = [

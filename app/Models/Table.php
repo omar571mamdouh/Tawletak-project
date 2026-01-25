@@ -6,9 +6,21 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Table extends Model
 {
+    use LogsActivity;
+
+public function getActivitylogOptions(): LogOptions
+{
+    return LogOptions::defaults()
+        ->useLogName('tables') 
+        ->logAll()
+        ->logOnlyDirty()
+        ->dontSubmitEmptyLogs();
+}
     protected $table = 'tables';
 
     protected $fillable = [

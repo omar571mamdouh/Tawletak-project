@@ -5,11 +5,22 @@ namespace App\Models;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Customer extends Authenticatable
 {
-    use HasApiTokens;
+    use HasApiTokens,LogsActivity;
 
+
+    public function getActivitylogOptions(): LogOptions
+{
+    return LogOptions::defaults()
+        ->useLogName('Customers') 
+        ->logAll()
+        ->logOnlyDirty()
+        ->dontSubmitEmptyLogs();
+}
     protected $fillable = [
         'name', 
         'phone', 

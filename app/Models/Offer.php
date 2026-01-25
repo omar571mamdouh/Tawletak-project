@@ -7,9 +7,22 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\CustomerLoyalty;
 use App\Models\LoyaltyTier;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Offer extends Model
 {
+
+use LogsActivity;
+
+  public function getActivitylogOptions(): LogOptions
+{
+    return LogOptions::defaults()
+        ->useLogName('Offer') 
+        ->logAll()
+        ->logOnlyDirty()
+        ->dontSubmitEmptyLogs();
+}
     protected $fillable = [
         'branch_id',
         'title',

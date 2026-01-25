@@ -5,9 +5,23 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Reservation extends Model
 {
+
+use LogsActivity;
+
+public function getActivitylogOptions(): LogOptions
+{
+    return LogOptions::defaults()
+        ->useLogName('reservations') 
+        ->logOnly(['customer_id','branch_id','table_id','reservation_time','party_size','expected_duration_minutes','status','seated_at','completed_at','confirmed_at','cancelled_at',])
+        ->logOnlyDirty()
+        ->dontSubmitEmptyLogs();
+}
+
     protected $fillable = [
         'customer_id',
         'branch_id',

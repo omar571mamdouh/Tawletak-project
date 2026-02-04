@@ -87,7 +87,7 @@ class StaffAuthController extends Controller
     ]);
 }
 
-    public function register(Request $request)
+   public function register(Request $request)
 {
     $data = $request->validate([
         'restaurant_id' => ['required','integer'],
@@ -108,25 +108,23 @@ class StaffAuthController extends Controller
             'phone'         => $data['phone'] ?? null,
             'email'         => $data['email'] ?? null,
             'password_hash' => Hash::make($data['password']),
-            'role'          => $data['role'],
             'is_active'     => true,
         ]);
 
-        // ✅ هات role record لنفس المطعم
+        $roleName = $data['role'];
+
         $role = RestaurantRole::query()
             ->where('restaurant_id', $staff->restaurant_id)
-            ->where('name', $staff->role) // owner/manager/staff
+            ->where('name', $roleName)
             ->first();
 
-        // لو الدور مش موجود (احتياط)
         if (!$role) {
             $role = RestaurantRole::create([
                 'restaurant_id' => $staff->restaurant_id,
-                'name' => $staff->role,
+                'name' => $roleName,
             ]);
         }
 
-        // ✅ اعمل assignment للستاف
         RestaurantStaffRoleAssignment::updateOrCreate(
             ['staff_id' => $staff->id],
             ['restaurant_role_id' => $role->id]
@@ -143,7 +141,7 @@ class StaffAuthController extends Controller
                     'id' => $staff->id,
                     'name' => $staff->name,
                     'email' => $staff->email,
-                    'role' => $staff->role,
+                    'role' => $role->name,
                     'restaurant_id' => $staff->restaurant_id,
                     'branch_id' => $staff->branch_id,
                 ],

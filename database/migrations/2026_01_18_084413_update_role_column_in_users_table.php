@@ -28,6 +28,5 @@ return new class extends Migration
                 ->default('super_admin')
                 ->change();
         });
-       
     }
 };

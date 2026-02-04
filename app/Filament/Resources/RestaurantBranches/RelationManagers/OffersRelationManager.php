@@ -6,7 +6,7 @@ use App\Filament\Resources\Offers\OfferResource; // عدّل حسب مكان Off
 use Filament\Actions\CreateAction;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Table;
-use App\Filament\Resources\RestaurantBranches\RelationManagers\OffersRelationManager;
+
 
 class OffersRelationManager extends RelationManager
 {

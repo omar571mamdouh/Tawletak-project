@@ -15,7 +15,7 @@ use LogsActivity;
   public function getActivitylogOptions(): LogOptions
 {
     return LogOptions::defaults()
-        ->useLogName('Offer-redemption') // اسم واضح
+        ->useLogName('Offer-redemption') 
         ->logAll()
         ->logOnlyDirty()
         ->dontSubmitEmptyLogs();

@@ -21,6 +21,7 @@ class RestaurantStaff extends Authenticatable
         'name',
         'phone',
         'email',
+        'role',
         'password_hash',
         'is_active',
     ];

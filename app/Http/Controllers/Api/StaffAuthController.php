@@ -11,6 +11,7 @@ use App\Models\RestaurantRole;
 use App\Models\RestaurantStaffRoleAssignment;
 use Illuminate\Support\Facades\DB;
 use App\Support\RestaurantStaffAudit;
+use Illuminate\Validation\Rule;
 
 
 class StaffAuthController extends Controller
@@ -87,23 +88,99 @@ class StaffAuthController extends Controller
     ]);
 }
 
-   public function register(Request $request)
+
+public function register(Request $request)
 {
+    // 1) Validate common staff fields + conditional fields
     $data = $request->validate([
-        'restaurant_id' => ['required','integer'],
-        'branch_id'     => ['nullable','integer'],
-        'name'          => ['required','string','max:200'],
-        'phone'         => ['nullable','string','max:50'],
-        'email'         => ['nullable','email','max:200','unique:restaurant_staff,email'],
-        'password'      => ['required','string','min:8','confirmed'],
-        'role'          => ['required','in:owner,manager,staff'],
+        // common
+        'name'     => ['required','string','max:200'],
+        'phone'    => ['nullable','string','max:50'],
+        'email'    => ['nullable','email','max:200','unique:restaurant_staff,email'],
+        'password' => ['required','string','min:8','confirmed'],
+        'category' => ['required','string','max:100'],
+        'opening_time'  => ['required','date_format:H:i'],
+        'closing_time'  => ['required','date_format:H:i'],
+
+        // staff-path (existing restaurant)
+        'restaurant_id' => [
+            'nullable',
+            'integer',
+            // Rule::exists('restaurants','id') // فعّلها لو عندك جدول restaurants
+        ],
+        'branch_id' => [
+            'nullable',
+            'integer',
+            // Rule::exists('restaurant_branches','id') // فعّلها حسب جدول الفروع عندك
+        ],
+
+        // owner-path (create restaurant)
+        'restaurant_name' => ['nullable','string','max:255'],
+        'branch_name'     => ['nullable','string','max:255'],
+        'address'         => ['nullable','string','max:255'],
+        'lat'             => ['nullable','numeric'],
+        'lng'             => ['nullable','numeric'],
     ]);
 
-    return DB::transaction(function () use ($data) {
+    // 2) Decide which flow:
+    $isOwnerCreate = !empty($data['restaurant_name']);
 
-        $staff = RestaurantStaff::create([
-            'restaurant_id' => $data['restaurant_id'],
-            'branch_id'     => $data['branch_id'] ?? null,
+    // 3) Guardrails: ممنوع تبعت الاتنين مع بعض
+    if ($isOwnerCreate && !empty($data['restaurant_id'])) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Do not send restaurant_id when restaurant_name is provided.',
+        ], 422);
+    }
+
+    // لو مش owner-create يبقى لازم restaurant_id
+    if (!$isOwnerCreate && empty($data['restaurant_id'])) {
+        return response()->json([
+            'success' => false,
+            'message' => 'restaurant_id is required when restaurant_name is not provided.',
+        ], 422);
+    }
+
+    return DB::transaction(function () use ($data, $isOwnerCreate) {
+
+        $restaurant = null;
+        $branch = null;
+
+        if ($isOwnerCreate) {
+            // ========= OWNER FLOW =========
+            // 1) Create Restaurant
+            $restaurant = \App\Models\Restaurant::create([
+                'name' => $data['restaurant_name'],
+                'category' => $data['category'],
+            ]);
+
+            // 2) Create Branch (اختياري)
+            $branch = \App\Models\RestaurantBranch::create([
+                'restaurant_id' => $restaurant->id,
+                'name'          => $data['branch_name'] ?? 'Main Branch',
+                'address'       => $data['address'] ?? null,
+                'lat'           => $data['lat'] ?? null,
+                'lng'           => $data['lng'] ?? null,
+                'opening_time'  => $data['opening_time'],
+                'closing_time'  => $data['closing_time'],
+            ]);
+
+            $restaurantId = $restaurant->id;
+            $branchId     = $branch->id;
+
+            $roleName = 'owner'; // ✅ internal default
+        } else {
+            // ========= STAFF FLOW =========
+            $restaurantId = $data['restaurant_id'];
+            $branchId     = $data['branch_id'] ?? null;
+
+            $roleName = 'staff'; // ✅ internal default (تقدر تخليها manager حسب منطقك)
+        }
+
+        // 4) Create staff
+        $staff = \App\Models\RestaurantStaff::create([
+            'restaurant_id' => $restaurantId,
+            'branch_id'     => $branchId,
             'name'          => $data['name'],
             'phone'         => $data['phone'] ?? null,
             'email'         => $data['email'] ?? null,
@@ -111,40 +188,53 @@ class StaffAuthController extends Controller
             'is_active'     => true,
         ]);
 
-        $roleName = $data['role'];
-
-        $role = RestaurantRole::query()
-            ->where('restaurant_id', $staff->restaurant_id)
+        // 5) Ensure role exists for that restaurant
+        $role = \App\Models\RestaurantRole::query()
+            ->where('restaurant_id', $restaurantId)
             ->where('name', $roleName)
             ->first();
 
         if (!$role) {
-            $role = RestaurantRole::create([
-                'restaurant_id' => $staff->restaurant_id,
+            $role = \App\Models\RestaurantRole::create([
+                'restaurant_id' => $restaurantId,
                 'name' => $roleName,
             ]);
         }
 
-        RestaurantStaffRoleAssignment::updateOrCreate(
+        // 6) Assign role to staff
+        \App\Models\RestaurantStaffRoleAssignment::updateOrCreate(
             ['staff_id' => $staff->id],
             ['restaurant_role_id' => $role->id]
         );
 
+        // 7) Token
         $token = $staff->createToken('staff-token')->plainTextToken;
 
+        // 8) Response (بدون role)
         return response()->json([
             'success' => true,
-            'message' => 'Staff registered successfully',
+            'message' => $isOwnerCreate ? 'Owner registered successfully' : 'Staff registered successfully',
             'data' => [
                 'token' => $token,
                 'staff' => [
                     'id' => $staff->id,
                     'name' => $staff->name,
                     'email' => $staff->email,
-                    'role' => $role->name,
                     'restaurant_id' => $staff->restaurant_id,
                     'branch_id' => $staff->branch_id,
                 ],
+                // لو owner-create رجّع restaurant/branch info (اختياري بس مفيد)
+                'restaurant' => $restaurant ? [
+                    'id' => $restaurant->id,
+                    'name' => $restaurant->name,
+                ] : null,
+                'branch' => $branch ? [
+                    'id' => $branch->id,
+                    'name' => $branch->name,
+                    'address' => $branch->address ?? null,
+                    'lat' => $branch->lat ?? null,
+                    'lng' => $branch->lng ?? null,
+                ] : null,
             ],
         ], 201);
     });

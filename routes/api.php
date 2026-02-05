@@ -174,7 +174,12 @@ Route::middleware('auth:staff')->group(function () {
     // Staff Logout
     Route::post('staff/auth/logout', [StaffAuthController::class, 'logout']);
 
-
+     Route::put('/owner/branch/profile', 
+        [StaffAuthController::class, 'updateBranchProfile']
+    );
+    Route::get('/owner/branch/profile', 
+        [StaffAuthController::class, 'getBranchProfile']
+    );
 
     // Owner only
     Route::middleware('owner')->group(function () {

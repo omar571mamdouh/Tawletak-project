@@ -190,4 +190,48 @@ public function register(Request $request)
     ]);
 }
 
+public function getBranchProfile()
+{
+    $staff = auth('staff')->user();
+
+    if (!$staff) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthenticated'
+        ], 401);
+    }
+
+    $branch = \App\Models\RestaurantBranch::find($staff->branch_id);
+
+    if (!$branch) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Branch not found'
+        ], 404);
+    }
+
+    $restaurant = \App\Models\Restaurant::find($staff->restaurant_id);
+
+    return response()->json([
+        'success' => true,
+        'data' => [
+            'restaurant' => $restaurant ? [
+                'id' => $restaurant->id,
+                'name' => $restaurant->name,
+                'category' => $restaurant->category,
+            ] : null,
+            'branch' => [
+                'id' => $branch->id,
+                'name' => $branch->name,
+                'address' => $branch->address,
+                'lat' => $branch->lat,
+                'lng' => $branch->lng,
+                'opening_time' => $branch->opening_time,
+                'closing_time' => $branch->closing_time,
+                'timezone' => $branch->timezone,
+            ],
+        ]
+    ]);
+}
+
 }

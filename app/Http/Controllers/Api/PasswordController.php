@@ -4,20 +4,21 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\PasswordOtp;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use App\Models\Customer;
+
 
 class PasswordController extends Controller
 {
-    private function identifier(Request $request): string
-    {
-        // Choose one: phone or email
-        if ($request->filled('phone')) return $request->input('phone');
-        return $request->input('email');
-    }
+   private function identifier(Request $request): string
+{
+    if ($request->filled('phone')) return trim((string)$request->input('phone'));
+    return strtolower(trim((string)$request->input('email')));
+}
+
 
     public function forgotPassword(Request $request)
     {
@@ -36,17 +37,18 @@ class PasswordController extends Controller
         $identifier = $this->identifier($request);
 
         // Make sure user exists
-        $userQuery = User::query();
-        $user = $request->filled('phone')
-            ? $userQuery->where('phone', $identifier)->first()
-            : $userQuery->where('email', $identifier)->first();
+        $customerQuery = Customer::query();
+$customer = $request->filled('phone')
+    ? $customerQuery->where('phone', $identifier)->first()
+    : $customerQuery->where('email', $identifier)->first();
 
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User not found'
-            ], 404);
-        }
+if (!$customer) {
+    return response()->json([
+        'success' => false,
+        'message' => 'Customer not found'
+    ], 404);
+}
+
 
         $otp = (string) random_int(10000, 99999); // 5 digits
         $expiresAt = now()->addMinutes(5);
@@ -66,7 +68,11 @@ class PasswordController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'OTP sent successfully'
+            'message' => 'OTP sent successfully',
+           'data' => [
+        'otp' => $otp,                 // للتست فقط
+        'expires_at' => $expiresAt->toISOString(),
+    ]
         ]);
     }
 
@@ -83,6 +89,14 @@ class PasswordController extends Controller
             'phone' => ['nullable','string','min:6'],
             'otp' => ['required','string','min:4','max:8'],
         ]);
+
+        if (!$request->filled('email') && !$request->filled('phone')) {
+    return response()->json([
+        'success' => false,
+        'message' => 'Email or phone is required'
+    ], 422);
+}
+
 
         $identifier = $this->identifier($request);
 
@@ -137,17 +151,18 @@ class PasswordController extends Controller
         }
 
         // Find user by identifier
-        $user = User::where('email', $record->identifier)
-            ->orWhere('phone', $record->identifier)
-            ->first();
+        $customer = Customer::where('email', $record->identifier)
+    ->orWhere('phone', $record->identifier)
+    ->first();
 
-        if (!$user) {
-            return response()->json(['success' => false, 'message' => 'User not found'], 404);
-        }
+if (!$customer) {
+    return response()->json(['success' => false, 'message' => 'Customer not found'], 404);
+}
 
-        $user->update([
-            'password' => Hash::make($request->password),
-        ]);
+$customer->update([
+    'password' => Hash::make($request->password),
+]);
+
 
         // cleanup
         PasswordOtp::where('identifier', $record->identifier)->delete();

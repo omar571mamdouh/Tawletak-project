@@ -70,7 +70,11 @@ class StaffPasswordController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'OTP sent successfully'
+            'message' => 'OTP sent successfully',
+            'data' => [
+        'otp' => $otp, // للتست فقط
+        'expires_at' => $expiresAt,
+    ]
         ]);
     }
 

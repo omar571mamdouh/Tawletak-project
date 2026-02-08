@@ -71,21 +71,32 @@ class StaffAuthController extends Controller
         statusCode: 200
     );
 
-    return response()->json([
-        'success' => true,
-        'message' => 'Login successful',
-        'data' => [
-            'token' => $token,
-            'staff' => [
-                'id' => $staff->id,
-                'name' => $staff->name,
-                'email' => $staff->email,
-                'role' => $assignment?->role?->name,
-                'restaurant_id' => $staff->restaurant_id,
-                'branch_id' => $staff->branch_id,
-            ],
+    $restaurant = \App\Models\Restaurant::find($staff->restaurant_id);
+$branch = \App\Models\RestaurantBranch::find($staff->branch_id);
+
+
+   return response()->json([
+    'success' => true,
+    'message' => 'Login successful',
+    'data' => [
+        'token' => $token,
+        'staff' => [
+            'id' => $staff->id,
+            'name' => $staff->name,
+            'email' => $staff->email,
+            'role' => $assignment?->role?->name,
         ],
-    ]);
+        'restaurant' => $restaurant ? [
+            'id' => $restaurant->id,
+            'name' => $restaurant->name,
+        ] : null,
+        'branch' => $branch ? [
+            'id' => $branch->id,
+            'name' => $branch->name,
+        ] : null,
+    ],
+]);
+
 }
 
 

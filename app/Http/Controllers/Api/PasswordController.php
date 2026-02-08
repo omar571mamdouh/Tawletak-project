@@ -10,97 +10,71 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use App\Models\Customer;
 
-
 class PasswordController extends Controller
 {
-   private function identifier(Request $request): string
-{
-    if ($request->filled('phone')) return trim((string)$request->input('phone'));
-    return strtolower(trim((string)$request->input('email')));
-}
-
+    private function emailIdentifier(Request $request): string
+    {
+        return strtolower(trim((string) $request->input('email')));
+    }
 
     public function forgotPassword(Request $request)
     {
         $request->validate([
-            'email' => ['nullable','email'],
-            'phone' => ['nullable','string','min:6'],
+            'email' => ['required', 'email'],
         ]);
 
-        if (!$request->filled('email') && !$request->filled('phone')) {
+        $email = $this->emailIdentifier($request);
+
+        $customer = Customer::query()
+            ->where('email', $email)
+            ->first();
+
+        if (!$customer) {
             return response()->json([
                 'success' => false,
-                'message' => 'Email or phone is required'
-            ], 422);
+                'message' => 'Customer not found'
+            ], 404);
         }
-
-        $identifier = $this->identifier($request);
-
-        // Make sure user exists
-        $customerQuery = Customer::query();
-$customer = $request->filled('phone')
-    ? $customerQuery->where('phone', $identifier)->first()
-    : $customerQuery->where('email', $identifier)->first();
-
-if (!$customer) {
-    return response()->json([
-        'success' => false,
-        'message' => 'Customer not found'
-    ], 404);
-}
-
 
         $otp = (string) random_int(10000, 99999); // 5 digits
         $expiresAt = now()->addMinutes(5);
 
         // invalidate old
-        PasswordOtp::where('identifier', $identifier)->delete();
+        PasswordOtp::where('identifier', $email)->delete();
 
         PasswordOtp::create([
-            'identifier' => $identifier,
+            'identifier' => $email,
             'otp_hash' => Hash::make($otp),
             'expires_at' => $expiresAt,
         ]);
 
-        // TODO: send OTP via SMS/Email
-        // Example: Mail::to($user->email)->send(new OtpMail($otp));
-        // Example SMS provider ...
+        // TODO: send OTP via Email
 
         return response()->json([
             'success' => true,
             'message' => 'OTP sent successfully',
-           'data' => [
-        'otp' => $otp,                 // للتست فقط
-        'expires_at' => $expiresAt->toISOString(),
-    ]
+            'data' => [
+                'otp' => $otp, // للتست فقط
+                'expires_at' => $expiresAt->toISOString(),
+            ]
         ]);
     }
 
     public function resendOtp(Request $request)
     {
-        // نفس forgotPassword (ممكن تعمل reuse)
         return $this->forgotPassword($request);
     }
 
     public function verifyOtp(Request $request)
     {
         $request->validate([
-            'email' => ['nullable','email'],
-            'phone' => ['nullable','string','min:6'],
-            'otp' => ['required','string','min:4','max:8'],
+            'email' => ['required', 'email'],
+            'otp' => ['required', 'string', 'min:4', 'max:8'],
         ]);
 
-        if (!$request->filled('email') && !$request->filled('phone')) {
-    return response()->json([
-        'success' => false,
-        'message' => 'Email or phone is required'
-    ], 422);
-}
+        $email = $this->emailIdentifier($request);
 
-
-        $identifier = $this->identifier($request);
-
-        $record = PasswordOtp::where('identifier', $identifier)->latest()->first();
+        $record = PasswordOtp::where('identifier', $email)->latest()->first();
 
         if (!$record) {
             return response()->json(['success' => false, 'message' => 'OTP not found'], 404);
@@ -133,8 +107,8 @@ if (!$customer) {
     public function resetPassword(Request $request)
     {
         $request->validate([
-            'reset_token' => ['required','string'],
-            'password' => ['required','string','min:8','confirmed'],
+            'reset_token' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
         $hashed = hash('sha256', $request->reset_token);
@@ -150,19 +124,15 @@ if (!$customer) {
             return response()->json(['success' => false, 'message' => 'Reset token expired'], 422);
         }
 
-        // Find user by identifier
-        $customer = Customer::where('email', $record->identifier)
-    ->orWhere('phone', $record->identifier)
-    ->first();
+        $customer = Customer::where('email', $record->identifier)->first();
 
-if (!$customer) {
-    return response()->json(['success' => false, 'message' => 'Customer not found'], 404);
-}
+        if (!$customer) {
+            return response()->json(['success' => false, 'message' => 'Customer not found'], 404);
+        }
 
-$customer->update([
-    'password' => Hash::make($request->password),
-]);
-
+        $customer->update([
+            'password' => Hash::make($request->password),
+        ]);
 
         // cleanup
         PasswordOtp::where('identifier', $record->identifier)->delete();

@@ -55,33 +55,52 @@ class FavoriteController extends Controller
      * GET /customer/favorites
      * Get all favorites from cache
      */
-    public function index(Request $request)
-    {
-        $customer = $this->currentCustomer($request);
-        if (!$customer) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthenticated',
-            ], 401);
-        }
-
-        $key = $this->cacheKey($customer->id);
-        $items = $this->normalizeItems(Cache::get($key, []));
-
-        // Ensure each item has is_favorite = true
-        $items = array_map(function ($item) {
-            $item['is_favorite'] = true;
-            return $item;
-        }, $items);
-
+   public function index(Request $request)
+{
+    $customer = $this->currentCustomer($request);
+    if (!$customer) {
         return response()->json([
-            'success' => true,
-            'data' => [
-                'items' => array_values($items),
-                'total_favorites' => count($items),
-            ],
-        ]);
+            'success' => false,
+            'message' => 'Unauthenticated',
+        ], 401);
     }
+
+    $key = $this->cacheKey($customer->id);
+
+    // normalize عشان لو الكاش فيه scalars / json string / objects
+    $items = $this->normalizeItems(Cache::get($key, []));
+
+    // Default Fields (شكل ثابت لكل العناصر)
+    $items = array_map(function ($item) {
+        return [
+            'restaurant_id'     => (int)($item['restaurant_id'] ?? 0),
+            'restaurant_name'   => (string)($item['restaurant_name'] ?? 'Unknown'),
+            'banner_url'        => $item['banner_url'] ?? null,
+
+            'rating'            => isset($item['rating']) ? (float)$item['rating'] : 0.0,
+            'reviews_count'     => isset($item['reviews_count']) ? (int)$item['reviews_count'] : 0,
+
+            'category_name'     => $item['category_name'] ?? null,
+            'location_text'     => $item['location_text'] ?? null,
+            'distance_km'       => isset($item['distance_km']) ? (float)$item['distance_km'] : null,
+
+            'tables_available'  => isset($item['tables_available']) ? (bool)$item['tables_available'] : true,
+            'is_favorite'       => true,
+        ];
+    }, $items);
+
+    // شيل أي item مش منطقي (restaurant_id = 0)
+    $items = array_values(array_filter($items, fn ($i) => (int)$i['restaurant_id'] > 0));
+
+    return response()->json([
+        'success' => true,
+        'data' => [
+            'items' => $items,
+            'total_favorites' => count($items),
+        ],
+    ]);
+}
+
 
     /**
      * POST /customer/favorites

@@ -52,9 +52,12 @@ Route::get('location/reverse', [LocationController::class, 'reverse']);
 | Restaurants (Public - READ ONLY)
 |--------------------------------------------------------------------------
 */
+Route::get('categories', [RestaurantController::class, 'mobileCategories']);
+Route::get('restaurants/by-category', [RestaurantController::class, 'mobileGroupedByCategory']);
 Route::get('restaurants', [RestaurantController::class, 'index']);
 Route::get('restaurants/{restaurant}', [RestaurantController::class, 'show']);
 Route::get('restaurants/{restaurant}/branches', [RestaurantController::class, 'branches']);
+
 
 Route::prefix('restaurants/{restaurant}')->group(function () {
     Route::get('menu/sections', [MenuController::class, 'sections']);

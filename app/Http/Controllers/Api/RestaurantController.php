@@ -119,7 +119,11 @@ public function mobileCategories(Request $request)
 
     $total = (int) $rows->sum('count');
 
-    // ✅ name + icon mapping
+    // ✅ icon base url (غير المسار حسب مكان تخزينك)
+    // لو الصور عندك في: public/storage/categories/*
+    $iconBase = rtrim(config('app.url'), '/') . '/storage/categories/';
+
+    // ✅ name + icon mapping (اسم الملف فقط)
     $map = [
         'all' => [
             'name' => 'All',
@@ -148,29 +152,33 @@ public function mobileCategories(Request $request)
         // ضيف أي كاتيجوريز تانية هنا...
     ];
 
-    // ✅ build response with icon
+    $defaultIconFile = $map['uncategorized']['icon'] ?? 'ic_default.png';
+
+    // ✅ build response with icon url
     $categories = collect([
         [
             'key'   => 'all',
             'name'  => $map['all']['name'],
-            'icon'  => $map['all']['icon'],
+            'icon'  => $iconBase . $map['all']['icon'],
             'count' => $total,
         ],
     ])->merge(
-        $rows->map(function ($r) use ($map) {
+        $rows->map(function ($r) use ($map, $iconBase, $defaultIconFile) {
             $key = (string) $r->key;
 
             $name = $map[$key]['name'] ?? ucfirst($key);
-            $icon = $map[$key]['icon'] ?? 'ic_default.png';
+            $iconFile = $map[$key]['icon'] ?? $defaultIconFile;
 
             return [
                 'key'   => $key,
                 'name'  => $name,
-                'icon'  => $icon,
+                'icon'  => $iconBase . $iconFile,   // ✅ URL كامل
                 'count' => (int) $r->count,
             ];
         })
-    )->values();
+    )
+    // لو مش عايز تكرار uncategorized مرتين لو موجود ضمن rows، سيبه زي ما هو (مش هيكرر all بس)
+    ->values();
 
     return response()->json([
         'success' => true,
@@ -179,20 +187,22 @@ public function mobileCategories(Request $request)
 }
 
 
+
 public function mobileGroupedByCategory(Request $request)
 {
     $data = $request->validate([
         'search'        => ['nullable', 'string', 'max:100'],
         'is_active'     => ['nullable'],
         'per_category'  => ['nullable', 'integer', 'min:1', 'max:50'],
-        // ✅ للمسافة (اختياري من الموبايل)
         'lat'           => ['nullable', 'numeric'],
         'lng'           => ['nullable', 'numeric'],
     ]);
 
     $perCategory = (int) ($data['per_category'] ?? 10);
-    $userLat = $request->filled('lat') ? (float) $request->lat : null;
-    $userLng = $request->filled('lng') ? (float) $request->lng : null;
+
+    // ✅ user location as double
+    $userLat = $request->filled('lat') ? (double) $request->lat : null;
+    $userLng = $request->filled('lng') ? (double) $request->lng : null;
 
     $q = Restaurant::query()
         ->select([
@@ -206,7 +216,6 @@ public function mobileGroupedByCategory(Request $request)
             'created_at',
             'updated_at',
         ])
-        // ✅ عشان location
         ->with(['branches:id,restaurant_id,address,lat,lng,is_active']);
 
     if ($request->filled('is_active')) {
@@ -223,19 +232,20 @@ public function mobileGroupedByCategory(Request $request)
 
     $restaurants = $q->latest()->get();
 
-    // helper لحساب المسافة
-    $haversineKm = function (float $lat1, float $lon1, float $lat2, float $lon2): float {
-        $earth = 6371; // km
-        $dLat = deg2rad($lat2 - $lat1);
-        $dLon = deg2rad($lon2 - $lon1);
+   // helper لحساب المسافة (لازم type يكون float مش double في PHP)
+$haversineKm = function (float $lat1, float $lon1, float $lat2, float $lon2): float {
+    $earth = 6371.0;
+    $dLat = deg2rad($lat2 - $lat1);
+    $dLon = deg2rad($lon2 - $lon1);
 
-        $a = sin($dLat / 2) * sin($dLat / 2)
-           + cos(deg2rad($lat1)) * cos(deg2rad($lat2))
-           * sin($dLon / 2) * sin($dLon / 2);
+    $a = sin($dLat / 2) * sin($dLat / 2)
+       + cos(deg2rad($lat1)) * cos(deg2rad($lat2))
+       * sin($dLon / 2) * sin($dLon / 2);
 
-        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
-        return $earth * $c;
-    };
+    $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+    return $earth * $c;
+};
+
 
     $grouped = $restaurants
         ->groupBy(function ($r) {
@@ -248,12 +258,14 @@ public function mobileGroupedByCategory(Request $request)
 
                 $branch = $r->branches->first();
 
-                $branchLat = isset($branch?->lat) && $branch->lat !== null ? (float) $branch->lat : null;
-                $branchLng = isset($branch?->lng) && $branch->lng !== null ? (float) $branch->lng : null;
+                // ✅ branch lat/lng as double
+                $branchLat = ($branch && $branch->lat !== null) ? (double) $branch->lat : null;
+                $branchLng = ($branch && $branch->lng !== null) ? (double) $branch->lng : null;
 
+                // ✅ distance as double
                 $distanceKm = null;
                 if ($userLat !== null && $userLng !== null && $branchLat !== null && $branchLng !== null) {
-                    $distanceKm = round($haversineKm($userLat, $userLng, $branchLat, $branchLng), 2);
+                    $distanceKm = (double) round($haversineKm($userLat, $userLng, $branchLat, $branchLng), 2);
                 }
 
                 return [
@@ -267,23 +279,20 @@ public function mobileGroupedByCategory(Request $request)
                     'created_at' => $r->created_at,
                     'updated_at' => $r->updated_at,
 
-                    // ✅ أسماء الحقول زي ما طلبت (Mobile-only)
-                    'cover_image' => null,          // لو عندك عمود لاحقًا اربطه هنا
+                    'cover_image' => null,
                     'rating' => 0.0,
                     'reviews_count' => 0,
 
                     'location' => [
-                        'address' => $branch?->address ?? null,
-                        'lat' => $branch?->lat ?? null,
-                        'lng' => $branch?->lng ?? null,
+                        'address' => $branch?->address,
+                        'lat' => $branchLat, // double|null
+                        'lng' => $branchLng, // double|null
                     ],
 
-                    'distance_km' => $distanceKm,
+                    'distance_km' => $distanceKm, // double|null
 
-                    // availability_status: available | few_left | full | unknown
                     'availability_status' => 'unknown',
-
-                    'is_fav' => false,              // لحد ما تعمل favorites
+                    'is_fav' => false,
                 ];
             })->values();
 
@@ -302,6 +311,7 @@ public function mobileGroupedByCategory(Request $request)
         'data' => $grouped,
     ]);
 }
+
 
 public function mobileNewOnTawletak(Request $request)
 {

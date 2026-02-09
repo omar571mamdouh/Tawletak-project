@@ -94,7 +94,7 @@ public function mobileCategories(Request $request)
         'search'    => ['nullable', 'string', 'max:100'],
     ]);
 
-    $q = Restaurant::query();
+    $q = \App\Models\Restaurant::query();
 
     if ($request->filled('is_active')) {
         $q->where('is_active', filter_var($request->is_active, FILTER_VALIDATE_BOOLEAN));
@@ -119,66 +119,96 @@ public function mobileCategories(Request $request)
 
     $total = (int) $rows->sum('count');
 
-    // Display names (عدّل اللي تحبه)
-    $nameMap = [
-        'all' => 'All',
-        'uncategorized' => 'Uncategorized',
-        'restaurant' => 'Restaurant',
-        'cafe' => 'Cafe',
-        'italian' => 'Italian',
-        'steak' => 'Steak',
+    // ✅ name + icon mapping
+    $map = [
+        'all' => [
+            'name' => 'All',
+            'icon' => 'ic_all.png',
+        ],
+        'uncategorized' => [
+            'name' => 'Uncategorized',
+            'icon' => 'ic_default.png',
+        ],
+        'restaurant' => [
+            'name' => 'Restaurant',
+            'icon' => 'ic_restaurant.png',
+        ],
+        'cafe' => [
+            'name' => 'Cafe',
+            'icon' => 'ic_cafe.png',
+        ],
+        'italian' => [
+            'name' => 'Italian',
+            'icon' => 'ic_italian.png',
+        ],
+        'sushi' => [
+            'name' => 'Sushi',
+            'icon' => 'ic_sushi.png',
+        ],
+        // ضيف أي كاتيجوريز تانية هنا...
     ];
 
+    // ✅ build response with icon
     $categories = collect([
-        ['key' => 'all', 'name' => $nameMap['all'], 'count' => $total],
+        [
+            'key'   => 'all',
+            'name'  => $map['all']['name'],
+            'icon'  => $map['all']['icon'],
+            'count' => $total,
+        ],
     ])->merge(
-        $rows->map(function ($r) use ($nameMap) {
-            $key = $r->key;
-            // default: Capitalize first letter لو مش موجود في map
-            $name = $nameMap[$key] ?? ucfirst($key);
-            return ['key' => $key, 'name' => $name, 'count' => (int) $r->count];
+        $rows->map(function ($r) use ($map) {
+            $key = (string) $r->key;
+
+            $name = $map[$key]['name'] ?? ucfirst($key);
+            $icon = $map[$key]['icon'] ?? 'ic_default.png';
+
+            return [
+                'key'   => $key,
+                'name'  => $name,
+                'icon'  => $icon,
+                'count' => (int) $r->count,
+            ];
         })
     )->values();
 
     return response()->json([
         'success' => true,
-        'data' => $categories,
+        'data'    => $categories,
     ]);
 }
+
 
 public function mobileGroupedByCategory(Request $request)
 {
     $data = $request->validate([
         'search'        => ['nullable', 'string', 'max:100'],
         'is_active'     => ['nullable'],
-        'per_category'  => ['nullable', 'integer', 'min:1', 'max:50'], // عدد المطاعم لكل كاتيجوري
-        'with_branches' => ['nullable'], // 0/1
-        'with_staff'    => ['nullable'], // 0/1
+        'per_category'  => ['nullable', 'integer', 'min:1', 'max:50'],
+        // ✅ للمسافة (اختياري من الموبايل)
+        'lat'           => ['nullable', 'numeric'],
+        'lng'           => ['nullable', 'numeric'],
     ]);
 
     $perCategory = (int) ($data['per_category'] ?? 10);
+    $userLat = $request->filled('lat') ? (float) $request->lat : null;
+    $userLng = $request->filled('lng') ? (float) $request->lng : null;
 
-    // ✅ خفيف للموبايل
-    $q = Restaurant::query()->select([
-        'id',
-        'name',
-        'description',
-        'phone',
-        'category',
-        'price_range',
-        'is_active',
-        'created_at',
-        'updated_at',
-        // لو عندك cover_image / rating / reviews_count ضيفهم هنا
-    ]);
+    $q = Restaurant::query()
+        ->select([
+            'id',
+            'name',
+            'description',
+            'phone',
+            'category',
+            'price_range',
+            'is_active',
+            'created_at',
+            'updated_at',
+        ])
+        // ✅ عشان location
+        ->with(['branches:id,restaurant_id,address,lat,lng,is_active']);
 
-    // optional relations
-    $with = [];
-    if ($request->boolean('with_branches')) $with[] = 'branches';
-    if ($request->boolean('with_staff')) $with[] = 'staff';
-    if (!empty($with)) $q->with($with);
-
-    // filters
     if ($request->filled('is_active')) {
         $q->where('is_active', filter_var($request->is_active, FILTER_VALIDATE_BOOLEAN));
     }
@@ -193,19 +223,76 @@ public function mobileGroupedByCategory(Request $request)
 
     $restaurants = $q->latest()->get();
 
-    // normalize category
+    // helper لحساب المسافة
+    $haversineKm = function (float $lat1, float $lon1, float $lat2, float $lon2): float {
+        $earth = 6371; // km
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
+
+        $a = sin($dLat / 2) * sin($dLat / 2)
+           + cos(deg2rad($lat1)) * cos(deg2rad($lat2))
+           * sin($dLon / 2) * sin($dLon / 2);
+
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+        return $earth * $c;
+    };
+
     $grouped = $restaurants
         ->groupBy(function ($r) {
             $key = strtolower(trim((string) $r->category));
             return $key !== '' ? $key : 'uncategorized';
         })
-        ->map(function ($items, $key) use ($perCategory) {
+        ->map(function ($items, $key) use ($perCategory, $userLat, $userLng, $haversineKm) {
+
+            $cards = $items->take($perCategory)->map(function ($r) use ($userLat, $userLng, $haversineKm) {
+
+                $branch = $r->branches->first();
+
+                $branchLat = isset($branch?->lat) && $branch->lat !== null ? (float) $branch->lat : null;
+                $branchLng = isset($branch?->lng) && $branch->lng !== null ? (float) $branch->lng : null;
+
+                $distanceKm = null;
+                if ($userLat !== null && $userLng !== null && $branchLat !== null && $branchLng !== null) {
+                    $distanceKm = round($haversineKm($userLat, $userLng, $branchLat, $branchLng), 2);
+                }
+
+                return [
+                    'id' => $r->id,
+                    'name' => $r->name,
+                    'description' => $r->description,
+                    'phone' => $r->phone,
+                    'category' => $r->category,
+                    'price_range' => $r->price_range,
+                    'is_active' => (bool) $r->is_active,
+                    'created_at' => $r->created_at,
+                    'updated_at' => $r->updated_at,
+
+                    // ✅ أسماء الحقول زي ما طلبت (Mobile-only)
+                    'cover_image' => null,          // لو عندك عمود لاحقًا اربطه هنا
+                    'rating' => 0.0,
+                    'reviews_count' => 0,
+
+                    'location' => [
+                        'address' => $branch?->address ?? null,
+                        'lat' => $branch?->lat ?? null,
+                        'lng' => $branch?->lng ?? null,
+                    ],
+
+                    'distance_km' => $distanceKm,
+
+                    // availability_status: available | few_left | full | unknown
+                    'availability_status' => 'unknown',
+
+                    'is_fav' => false,              // لحد ما تعمل favorites
+                ];
+            })->values();
+
             return [
                 'category' => [
                     'key' => $key,
                     'name' => $key === 'uncategorized' ? 'Uncategorized' : ucfirst($key),
                 ],
-                'restaurants' => RestaurantResource::collection($items->take($perCategory))->resolve(),
+                'restaurants' => $cards,
             ];
         })
         ->values();
@@ -216,4 +303,41 @@ public function mobileGroupedByCategory(Request $request)
     ]);
 }
 
+public function mobileNewOnTawletak(Request $request)
+{
+    $data = $request->validate([
+        'search'   => ['nullable', 'string', 'max:100'],
+        'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+    ]);
+
+    $perPage = (int) ($data['per_page'] ?? 12);
+
+    $q = Restaurant::query()
+        ->select([
+            'id',
+            'name',
+            'category',
+            'is_active',
+            'created_at',
+            // لو عندك logo/cover_image ضيفه هنا
+            // 'logo',
+            // 'cover_image',
+        ])
+        ->where('is_active', true)
+        ->latest(); // latest created_at
+
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $q->where('name', 'like', "%$search%");
+    }
+
+      $items = $q->limit(8)->get();
+
+     return response()->json([
+        'success' => true,
+        'data' => [
+            'items' => $items,
+        ],
+    ]);
+}
 }

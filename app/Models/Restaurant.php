@@ -58,4 +58,10 @@ public function menuItems()
     return $this->hasMany(MenuItem::class);
 }
 
+public function favorites()
+{
+    return $this->hasMany(\App\Models\Favorite::class, 'restaurant_id');
+}
+
+
 }

@@ -54,6 +54,7 @@ Route::get('location/reverse', [LocationController::class, 'reverse']);
 */
 Route::get('categories', [RestaurantController::class, 'mobileCategories']);
 Route::get('restaurants/by-category', [RestaurantController::class, 'mobileGroupedByCategory']);
+Route::get('restaurants/new', [RestaurantController::class, 'mobileNewOnTawletak']);
 Route::get('restaurants', [RestaurantController::class, 'index']);
 Route::get('restaurants/{restaurant}', [RestaurantController::class, 'show']);
 Route::get('restaurants/{restaurant}/branches', [RestaurantController::class, 'branches']);
@@ -139,6 +140,7 @@ Route::middleware('auth:customer')->group(function () {
     // Rewards
     Route::get('customer/rewards', [RewardsController::class, 'index']);
     Route::get('customer/rewards/active', [RewardsController::class, 'active']);
+    Route::get('customer/rewards/{reward}/confirm', [RewardsController::class, 'confirm']);
     Route::post('customer/rewards/redeem', [RewardsController::class, 'redeem']);
     Route::get('customer/rewards/history', [RewardsController::class, 'history']);
 

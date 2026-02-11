@@ -140,6 +140,8 @@ Route::middleware('auth:customer')->group(function () {
     // Rewards
     Route::get('customer/rewards', [RewardsController::class, 'index']);
     Route::get('customer/rewards/active', [RewardsController::class, 'active']);
+    Route::get('customer/rewards/expired', [RewardsController::class, 'active']);
+    Route::get('customer/rewards/used', [RewardsController::class, 'active']);
     Route::get('customer/rewards/{reward}/confirm', [RewardsController::class, 'confirm']);
     Route::post('customer/rewards/redeem', [RewardsController::class, 'redeem']);
     Route::get('customer/rewards/history', [RewardsController::class, 'history']);

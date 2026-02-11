@@ -58,10 +58,12 @@ class MenuController extends Controller
                                 'description' => $item->description,
                                 'price' => (float) $item->price,
                                 'currency' => $currency,
-                                'image' => $item->image,
+                                'image' => $item->image ? asset('storage/private/' . $item->image) : null,
                                 'is_available' => (bool) $item->is_available,
                                 'is_featured' => (bool) $item->is_featured,
                                 'sort_order' => (int) $item->sort_order,
+                                'reviewsCount' => 10,   // قيمة تجريبية
+                                'rating' => 4.5,        // قيمة تجريبية
                             ];
                         })->values();
                     }
@@ -77,7 +79,6 @@ class MenuController extends Controller
      */
     public function sectionItems(Request $request, Restaurant $restaurant, MenuSection $section)
     {
-        // تأمين: لازم السيكشن يتبع نفس المطعم
         if ((int) $section->restaurant_id !== (int) $restaurant->id) {
             return response()->json([
                 'success' => false,
@@ -110,10 +111,12 @@ class MenuController extends Controller
                         'description' => $item->description,
                         'price' => (float) $item->price,
                         'currency' => $currency,
-                        'image' => $item->image,
+                        'image' => $item->image ? asset('storage/private/' . $item->image) : null,
                         'is_available' => (bool) $item->is_available,
                         'is_featured' => (bool) $item->is_featured,
                         'sort_order' => (int) $item->sort_order,
+                        'reviewsCount' => 10,   // قيمة تجريبية
+                        'rating' => 4.5,        // قيمة تجريبية
                     ];
                 })->values(),
             ],
@@ -146,7 +149,9 @@ class MenuController extends Controller
                         'description' => $item->description,
                         'price' => (float) $item->price,
                         'currency' => $currency,
-                        'image' => $item->image,
+                        'image' => $item->image ? asset('storage/private/' . $item->image) : null,
+                        'reviewsCount' => 10,   // قيمة تجريبية
+                        'rating' => 4.5,        // قيمة تجريبية
                     ];
                 })->values(),
             ],

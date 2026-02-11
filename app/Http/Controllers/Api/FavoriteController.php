@@ -55,7 +55,7 @@ class FavoriteController extends Controller
      * GET /customer/favorites
      * Get all favorites from cache
      */
-   public function index(Request $request)
+  public function index(Request $request)
 {
     $customer = $this->currentCustomer($request);
     if (!$customer) {
@@ -70,36 +70,76 @@ class FavoriteController extends Controller
     // normalize عشان لو الكاش فيه scalars / json string / objects
     $items = $this->normalizeItems(Cache::get($key, []));
 
-    // Default Fields (شكل ثابت لكل العناصر)
-    $items = array_map(function ($item) {
+    // user location if provided
+    $userLat = $request->filled('lat') ? (double) $request->lat : null;
+    $userLng = $request->filled('lng') ? (double) $request->lng : null;
+
+    // helper لحساب المسافة بالكيلومتر
+    $haversineKm = function (float $lat1, float $lon1, float $lat2, float $lon2): float {
+        $earth = 6371.0;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
+
+        $a = sin($dLat / 2) * sin($dLat / 2)
+           + cos(deg2rad($lat1)) * cos(deg2rad($lat2))
+           * sin($dLon / 2) * sin($dLon / 2);
+
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+        return $earth * $c;
+    };
+
+    $restaurants = array_map(function ($item) use ($userLat, $userLng, $haversineKm) {
+
+        // جلب الـ restaurant من الـ DB مع أول فرع
+        $restaurant = \App\Models\Restaurant::with(['branches'])->find($item['restaurant_id']);
+        $branch = $restaurant?->branches->first();
+
+        $branchLat = $branch?->lat ? (double)$branch->lat : null;
+        $branchLng = $branch?->lng ? (double)$branch->lng : null;
+
+        $distanceKm = null;
+        if ($userLat !== null && $userLng !== null && $branchLat !== null && $branchLng !== null) {
+            $distanceKm = round($haversineKm($userLat, $userLng, $branchLat, $branchLng), 2);
+        }
+
         return [
-            'restaurant_id'     => (int)($item['restaurant_id'] ?? 0),
-            'restaurant_name'   => (string)($item['restaurant_name'] ?? 'Unknown'),
-            'banner_url'        => $item['banner_url'] ?? null,
+            'id' => $restaurant->id ?? 0,
+            'name' => $restaurant->name ?? 'Unknown',
+            'description' => $restaurant->description ?? null,
+            'phone' => $restaurant->phone ?? null,
+            'category' => $restaurant->category ?? null,
+            'price_range' => $restaurant->price_range ?? null,
+            'is_active' => (bool)($restaurant->is_active ?? true),
+            'created_at' => $restaurant->created_at ?? now(),
+            'updated_at' => $restaurant->updated_at ?? now(),
 
-            'rating'            => isset($item['rating']) ? (float)$item['rating'] : 0.0,
-            'reviews_count'     => isset($item['reviews_count']) ? (int)$item['reviews_count'] : 0,
+            'cover_image' => $branch?->cover_image ? asset('storage/private/' . $branch->cover_image) : null,
+            'rating' => isset($item['rating']) ? (float)$item['rating'] : 0,
+            'reviews_count' => isset($item['reviews_count']) ? (int)$item['reviews_count'] : 0,
 
-            'category_name'     => $item['category_name'] ?? null,
-            'location_text'     => $item['location_text'] ?? null,
-            'distance_km'       => isset($item['distance_km']) ? (float)$item['distance_km'] : null,
+            'location' => [
+                'address' => $branch?->address ?? null,
+                'lat' => $branchLat,
+                'lng' => $branchLng,
+            ],
 
-            'tables_available'  => isset($item['tables_available']) ? (bool)$item['tables_available'] : true,
-            'is_favorite'       => true,
+            'distance_km' => $distanceKm,
+            'availability_status' => 'unknown',
+            'is_fav' => true,
         ];
     }, $items);
-
-    // شيل أي item مش منطقي (restaurant_id = 0)
-    $items = array_values(array_filter($items, fn ($i) => (int)$i['restaurant_id'] > 0));
 
     return response()->json([
         'success' => true,
         'data' => [
-            'items' => $items,
-            'total_favorites' => count($items),
-        ],
+            [
+                'restaurants' => $restaurants
+            ]
+        ]
     ]);
 }
+
+
 
 
     /**

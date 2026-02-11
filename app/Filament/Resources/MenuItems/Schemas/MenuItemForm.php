@@ -51,7 +51,6 @@ class MenuItemForm
                     
                 FileUpload::make('image')
                     ->image(),
-                    
                 Toggle::make('is_available')
                     ->required()
                     ->default(true),

@@ -248,6 +248,10 @@ Route::middleware('auth:staff')->group(function () {
     Route::post('staff/tables', [TableController::class, 'store']);
     Route::put('staff/tables/{table}', [TableController::class, 'update']);   // أو PATCH
     Route::delete('staff/tables/{table}', [TableController::class, 'destroy']);
+    Route::post('staff/tables/{table}/reserve', [TableController::class, 'reserve']);
+    Route::post('staff/tables/{table}/select', [TableController::class, 'select']);
+
+
 
     // Table Status
 

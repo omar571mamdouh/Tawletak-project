@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Table;
 use App\Models\RestaurantBranch;
 use Illuminate\Http\Request;
+use App\Models\TableStatus;
 
 class TableController extends Controller
 {
@@ -191,4 +192,40 @@ class TableController extends Controller
             'message' => 'Table deleted successfully',
         ]);
     }
+
+    // TableController.php
+
+public function reserve(Table $table)
+{
+    $this->assertTableInStaffRestaurant($table);
+
+    $tableStatus = TableStatus::updateOrCreate(
+        ['table_id' => $table->id],
+        ['status' => 'reserved']
+    );
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Table reserved successfully',
+        'data' => $tableStatus,
+    ]);
+}
+
+public function select(Table $table)
+{
+    $this->assertTableInStaffRestaurant($table);
+
+    $tableStatus = TableStatus::updateOrCreate(
+        ['table_id' => $table->id],
+        ['status' => 'occupied']  // بدل 'selected'
+    );
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Table marked as occupied successfully',
+        'data' => $tableStatus,
+    ]);
+}
+
+
 }

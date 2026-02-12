@@ -57,27 +57,23 @@ public function show(Restaurant $restaurant, Request $request)
 {
     $restaurant->load(['branches', 'staff']); 
 
-    // ✅ helper لحساب المسافة بالكيلومتر
     $haversineKm = function (float $lat1, float $lon1, float $lat2, float $lon2): float {
         $earth = 6371.0;
         $dLat = deg2rad($lat2 - $lat1);
         $dLon = deg2rad($lon2 - $lon1);
-
         $a = sin($dLat / 2) * sin($dLat / 2)
            + cos(deg2rad($lat1)) * cos(deg2rad($lat2))
            * sin($dLon / 2) * sin($dLon / 2);
-
         $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
         return $earth * $c;
     };
 
-    // ✅ user location if provided
     $userLat = $request->filled('lat') ? (double) $request->lat : null;
     $userLng = $request->filled('lng') ? (double) $request->lng : null;
 
-    // أضف القيم التجريبية للـ branches + distance
-    $restaurant->branches->transform(function ($branch) use ($userLat, $userLng, $haversineKm) {
+    $allAvailableTime = []; // هنا هنخزن المواعيد لكل الفروع
 
+    $restaurant->branches->transform(function ($branch) use ($userLat, $userLng, $haversineKm, &$allAvailableTime) {
         $branchLat = $branch->lat !== null ? (double) $branch->lat : null;
         $branchLng = $branch->lng !== null ? (double) $branch->lng : null;
 
@@ -85,6 +81,19 @@ public function show(Restaurant $restaurant, Request $request)
         if ($userLat !== null && $userLng !== null && $branchLat !== null && $branchLng !== null) {
             $distanceKm = round($haversineKm($userLat, $userLng, $branchLat, $branchLng), 2);
         }
+
+        // حساب available_time كل نص ساعة
+        $availableTime = [];
+        if ($branch->opening_time && $branch->closing_time) {
+            $start = strtotime($branch->opening_time);
+            $end   = strtotime($branch->closing_time);
+            for ($t = $start; $t <= $end; $t += 1800) {
+                $availableTime[] = date('H:i', $t);
+            }
+        }
+
+        // نجمع كل المواعيد على مستوى restaurant
+        $allAvailableTime = array_merge($allAvailableTime, $availableTime);
 
         return [
             'id' => $branch->id,
@@ -99,19 +108,23 @@ public function show(Restaurant $restaurant, Request $request)
             'is_active' => (bool) $branch->is_active,
             'created_at' => $branch->created_at,
             'updated_at' => $branch->updated_at,
-
-            // القيم التجريبية الجديدة
             'reviewsCount' => 10,
             'rating' => 4.5,
-            'distanceKm' => $distanceKm, // هنا
+            'distanceKm' => $distanceKm,
             'availabilityStatus' => 'Open',
             'isFav' => false,
             'coverImage' => $branch->cover_image ? asset('storage/private/' . $branch->cover_image) : null,
+            'available_time' => $availableTime,
         ];
     });
 
+    // إزالة التكرار وترتيب المواعيد قبل إرسالها للـ resource
+    $restaurant->available_time = array_values(array_unique($allAvailableTime));
+
     return new RestaurantResource($restaurant);
 }
+
+
 
 
 

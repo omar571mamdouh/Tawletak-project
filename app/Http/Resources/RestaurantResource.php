@@ -26,6 +26,7 @@ class RestaurantResource extends JsonResource
             'staff' => RestaurantStaffResource::collection(
                 $this->whenLoaded('staff')
             ),
+            'available_time' => $this->available_time ?? [],
         ];
     }
 }

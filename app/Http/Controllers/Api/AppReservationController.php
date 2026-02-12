@@ -3,21 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AppReservation; // ⬅️ هنا التغيير
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AppReservationController extends Controller
 {
-    private bool $mockMode = true;
-
-    public function __construct()
-    {
-        if (!session()->has('mock_reservations')) {
-            session(['mock_reservations' => []]);
-        }
-    }
-
     private function ok(string $message, $data = null, int $code = 200)
     {
         return response()->json([
@@ -40,44 +32,42 @@ class AppReservationController extends Controller
     {
         $date = $request->query('date') ?? now()->toDateString();
 
-        $all = session('mock_reservations');
-        $items = array_filter($all, fn($r) => $r['date'] === $date);
+        $items = AppReservation::where('date', $date)->get();
 
         return $this->ok('Home reservations', [
             'date' => $date,
             'stats' => [
-                'bookings' => count($items),
-                'pending'  => count(array_filter($items, fn($r) => $r['status'] === 'pending')),
+                'bookings' => $items->count(),
+                'pending'  => $items->where('status', 'pending')->count(),
             ],
-            'items' => array_values($items),
+            'items' => $items,
         ]);
     }
 
     public function index(Request $request)
     {
-        $status = $request->query('status');
-        $date   = $request->query('date');
+        $query = AppReservation::query();
 
-        $items = session('mock_reservations');
+        if ($status = $request->query('status')) {
+            $query->where('status', $status);
+        }
+        if ($date = $request->query('date')) {
+            $query->where('date', $date);
+        }
 
-        if ($status) {
-            $items = array_filter($items, fn($r) => $r['status'] === $status);
-        }
-        if ($date) {
-            $items = array_filter($items, fn($r) => $r['date'] === $date);
-        }
+        $items = $query->get();
 
         return $this->ok('Reservations list', [
             'filters' => [
-                'status' => $status,
-                'date' => $date,
+                'status' => $status ?? null,
+                'date' => $date ?? null,
             ],
             'pagination' => [
                 'page' => (int)($request->query('page', 1)),
                 'per_page' => (int)($request->query('per_page', 10)),
-                'total' => count($items),
+                'total' => $items->count(),
             ],
-            'items' => array_values($items),
+            'items' => $items,
         ]);
     }
 
@@ -99,20 +89,20 @@ class AppReservationController extends Controller
 
         $data['code'] = 'CODE-' . strtoupper(Str::random(6));
         $data['status'] = 'pending';
-        $data['id'] = random_int(1000, 9999);
-        $data['created_at'] = now()->toDateTimeString();
-        $data['updated_at'] = now()->toDateTimeString();
 
-        // حفظ في session
-        $mock = session('mock_reservations');
-        $mock[] = $data;
-        session(['mock_reservations' => $mock]);
+        $reservation = AppReservation::create($data);
 
-        return $this->ok('Reservation created successfully (MOCK)', $data, 201);
+        return $this->ok('Reservation created successfully', $reservation, 201);
     }
 
     public function update(Request $request, $id)
     {
+        $reservation = AppReservation::find($id);
+        
+        if (!$reservation) {
+            return $this->fail('Reservation not found', null, 404);
+        }
+
         try {
             $data = $request->validate([
                 'customer_name'  => ['sometimes','string','max:255'],
@@ -127,45 +117,45 @@ class AppReservationController extends Controller
             return $this->fail('Validation error', $e->errors(), 422);
         }
 
-        $mock = session('mock_reservations');
-        foreach ($mock as &$r) {
-            if ($r['id'] == $id) {
-                $r = array_merge($r, $data);
-                $r['updated_at'] = now()->toDateTimeString();
-                session(['mock_reservations' => $mock]);
-                return $this->ok('Reservation updated successfully (MOCK)', $r);
-            }
-        }
+        $reservation->update($data);
 
-        return $this->fail('Reservation not found', null, 404);
+        return $this->ok('Reservation updated successfully', $reservation);
     }
 
     public function destroy($id)
     {
-        $mock = session('mock_reservations');
-        $mock = array_filter($mock, fn($r) => $r['id'] != $id);
-        session(['mock_reservations' => array_values($mock)]);
+        $reservation = AppReservation::find($id);
+        
+        if (!$reservation) {
+            return $this->fail('Reservation not found', null, 404);
+        }
 
-        return $this->ok('Reservation deleted successfully (MOCK)', ['id' => (int)$id]);
+        $reservation->delete();
+
+        return $this->ok('Reservation deleted successfully', ['id' => (int)$id]);
     }
 
     public function confirm($id)
     {
-        $mock = session('mock_reservations');
-        foreach ($mock as &$r) {
-            if ($r['id'] == $id) {
-                $r['status'] = 'confirmed';
-                $r['updated_at'] = now()->toDateTimeString();
-                session(['mock_reservations' => $mock]);
-                return $this->ok('Reservation confirmed (MOCK)', $r);
-            }
+        $reservation = AppReservation::find($id);
+        
+        if (!$reservation) {
+            return $this->fail('Reservation not found', null, 404);
         }
 
-        return $this->fail('Reservation not found', null, 404);
+        $reservation->update(['status' => 'confirmed']);
+
+        return $this->ok('Reservation confirmed', $reservation);
     }
 
     public function cancel(Request $request, $id)
     {
+        $reservation = AppReservation::find($id);
+        
+        if (!$reservation) {
+            return $this->fail('Reservation not found', null, 404);
+        }
+
         try {
             $data = $request->validate([
                 'reason' => ['nullable','string','max:1000'],
@@ -174,17 +164,12 @@ class AppReservationController extends Controller
             return $this->fail('Validation error', $e->errors(), 422);
         }
 
-        $mock = session('mock_reservations');
-        foreach ($mock as &$r) {
-            if ($r['id'] == $id) {
-                $r['status'] = 'cancelled';
-                $r['reason'] = $data['reason'] ?? null;
-                $r['cancelled_at'] = now()->toDateTimeString();
-                session(['mock_reservations' => $mock]);
-                return $this->ok('Reservation cancelled (MOCK)', $r);
-            }
-        }
+        $reservation->update([
+            'status' => 'cancelled',
+            'reason' => $data['reason'] ?? null,
+            'cancelled_at' => now(),
+        ]);
 
-        return $this->fail('Reservation not found', null, 404);
+        return $this->ok('Reservation cancelled', $reservation);
     }
 }

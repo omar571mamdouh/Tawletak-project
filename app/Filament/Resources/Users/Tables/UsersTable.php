@@ -30,10 +30,7 @@ class UsersTable
                     ->label('Email address')
                     ->searchable(),
 
-                TextColumn::make('restaurant.name')
-                    ->searchable(),
-                TextColumn::make('branch.name')
-                    ->searchable(),
+                
                 IconColumn::make('is_active')
                     ->boolean(),
                 TextColumn::make('created_at')

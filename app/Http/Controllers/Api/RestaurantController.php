@@ -8,33 +8,52 @@ use App\Models\Restaurant;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class RestaurantController extends Controller
 {
-    public function index(Request $request)
+   public function index(Request $request)
 {
-    $q = Restaurant::query()->with(['branches','staff']); 
+    $restaurants = Restaurant::with(['branches', 'staff'])
+        ->latest()
+        ->paginate(15);
 
-    if ($request->filled('is_active')) {
-        $q->where('is_active', filter_var($request->is_active, FILTER_VALIDATE_BOOLEAN));
+    $customer = auth('customer')->user();
+    $favorites = [];
+
+    if ($customer) {
+        $key = "favorites:user:{$customer->id}";
+        $favorites = Cache::get($key, []);
     }
 
-    if ($request->filled('category')) {
-        $q->where('category', $request->category);
-    }
+    $restaurants->getCollection()->transform(function ($restaurant) use ($favorites) {
 
-    if ($request->filled('search')) {
-        $search = $request->search;
-        $q->where(function ($qq) use ($search) {
-            $qq->where('name', 'like', "%$search%")
-               ->orWhere('phone', 'like', "%$search%");
-        });
-    }
+        $isFav = collect($favorites)
+            ->pluck('restaurant_id')
+            ->contains($restaurant->id);
 
-    $restaurants = $q->latest()->paginate($request->integer('per_page', 15));
+        return [
+            'id' => $restaurant->id,
+            'name' => $restaurant->name,
+            'description' => $restaurant->description,
+            'phone' => $restaurant->phone,
+            'category' => $restaurant->category,
+            'price_range' => $restaurant->price_range,
+            'is_active' => (bool) $restaurant->is_active,
+            'created_at' => $restaurant->created_at,
+            'updated_at' => $restaurant->updated_at,
 
-    return RestaurantResource::collection($restaurants);
+            'is_fav' => $isFav,
+
+            'branches' => $restaurant->branches,
+            'staff' => $restaurant->staff,
+            'available_time' => $restaurant->available_time ?? [],
+        ];
+    });
+
+    return response()->json($restaurants);
 }
+
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -53,78 +72,48 @@ class RestaurantController extends Controller
             ->setStatusCode(201);
     }
 
-public function show(Restaurant $restaurant, Request $request)
+public function show(Request $request, $id)
 {
-    $restaurant->load(['branches', 'staff']); 
+    // جلب الـ restaurant مع branches و staff
+    $restaurant = Restaurant::with(['branches', 'staff'])->findOrFail($id);
 
-    $haversineKm = function (float $lat1, float $lon1, float $lat2, float $lon2): float {
-        $earth = 6371.0;
-        $dLat = deg2rad($lat2 - $lat1);
-        $dLon = deg2rad($lon2 - $lon1);
-        $a = sin($dLat / 2) * sin($dLat / 2)
-           + cos(deg2rad($lat1)) * cos(deg2rad($lat2))
-           * sin($dLon / 2) * sin($dLon / 2);
-        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
-        return $earth * $c;
-    };
+    // جلب الـ customer
+    $customer = auth('customer')->user();
+    $favorites = [];
 
-    $userLat = $request->filled('lat') ? (double) $request->lat : null;
-    $userLng = $request->filled('lng') ? (double) $request->lng : null;
+    if ($customer) {
+        $key = "favorites:user:{$customer->id}";
+        $favorites = Cache::get($key, []);
+    }
 
-    $allAvailableTime = []; // هنا هنخزن المواعيد لكل الفروع
+    // استخدام نفس طريقة الـ index
+    $isFav = collect($favorites)
+        ->pluck('restaurant_id')
+        ->contains($restaurant->id);
 
-    $restaurant->branches->transform(function ($branch) use ($userLat, $userLng, $haversineKm, &$allAvailableTime) {
-        $branchLat = $branch->lat !== null ? (double) $branch->lat : null;
-        $branchLng = $branch->lng !== null ? (double) $branch->lng : null;
+    // transform نفس الـ index
+    $restaurantTransformed = [
+        'id' => $restaurant->id,
+        'name' => $restaurant->name,
+        'description' => $restaurant->description,
+        'phone' => $restaurant->phone,
+        'category' => $restaurant->category,
+        'price_range' => $restaurant->price_range,
+        'is_active' => (bool) $restaurant->is_active,
+        'created_at' => $restaurant->created_at,
+        'updated_at' => $restaurant->updated_at,
 
-        $distanceKm = null;
-        if ($userLat !== null && $userLng !== null && $branchLat !== null && $branchLng !== null) {
-            $distanceKm = round($haversineKm($userLat, $userLng, $branchLat, $branchLng), 2);
-        }
+        'is_fav' => $isFav, // ✅ نفس الـ index
 
-        // حساب available_time كل نص ساعة
-        $availableTime = [];
-        if ($branch->opening_time && $branch->closing_time) {
-            $start = strtotime($branch->opening_time);
-            $end   = strtotime($branch->closing_time);
-            for ($t = $start; $t <= $end; $t += 1800) {
-                $availableTime[] = date('H:i', $t);
-            }
-        }
+        'branches' => $restaurant->branches,
+        'staff' => $restaurant->staff,
+        'available_time' => $restaurant->available_time ?? [],
+    ];
 
-        // نجمع كل المواعيد على مستوى restaurant
-        $allAvailableTime = array_merge($allAvailableTime, $availableTime);
-
-        return [
-            'id' => $branch->id,
-            'restaurant_id' => $branch->restaurant_id,
-            'name' => $branch->name,
-            'address' => $branch->address,
-            'lat' => $branch->lat,
-            'lng' => $branch->lng,
-            'opening_time' => $branch->opening_time,
-            'closing_time' => $branch->closing_time,
-            'timezone' => $branch->timezone,
-            'is_active' => (bool) $branch->is_active,
-            'created_at' => $branch->created_at,
-            'updated_at' => $branch->updated_at,
-            'reviewsCount' => 10,
-            'rating' => 4.5,
-            'distanceKm' => $distanceKm,
-            'availabilityStatus' => 'Open',
-            'isFav' => false,
-            'coverImage' => $branch->cover_image ? asset('storage/private/' . $branch->cover_image) : null,
-            'available_time' => $availableTime,
-        ];
-    });
-
-    // إزالة التكرار وترتيب المواعيد قبل إرسالها للـ resource
-    $restaurant->available_time = array_values(array_unique($allAvailableTime));
-
-    return new RestaurantResource($restaurant);
+    return response()->json([
+        'data' => $restaurantTransformed
+    ]);
 }
-
-
 
 
 
@@ -269,9 +258,18 @@ public function mobileGroupedByCategory(Request $request)
 
     $perCategory = (int) ($data['per_category'] ?? 10);
 
-    // ✅ user location as double
+    // ✅ user location
     $userLat = $request->filled('lat') ? (double) $request->lat : null;
     $userLng = $request->filled('lng') ? (double) $request->lng : null;
+
+    // ✅ get logged customer favorites from cache
+    $customer = $request->user('customer');
+    $favorites = [];
+
+    if ($customer) {
+        $key = "favorites:user:{$customer->id}";
+        $favorites = Cache::get($key, []);
+    }
 
     $q = Restaurant::query()
         ->select([
@@ -301,41 +299,43 @@ public function mobileGroupedByCategory(Request $request)
 
     $restaurants = $q->latest()->get();
 
-   // helper لحساب المسافة (لازم type يكون float مش double في PHP)
-$haversineKm = function (float $lat1, float $lon1, float $lat2, float $lon2): float {
-    $earth = 6371.0;
-    $dLat = deg2rad($lat2 - $lat1);
-    $dLon = deg2rad($lon2 - $lon1);
+    // ✅ haversine helper
+    $haversineKm = function (float $lat1, float $lon1, float $lat2, float $lon2): float {
+        $earth = 6371.0;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
 
-    $a = sin($dLat / 2) * sin($dLat / 2)
-       + cos(deg2rad($lat1)) * cos(deg2rad($lat2))
-       * sin($dLon / 2) * sin($dLon / 2);
+        $a = sin($dLat / 2) * sin($dLat / 2)
+           + cos(deg2rad($lat1)) * cos(deg2rad($lat2))
+           * sin($dLon / 2) * sin($dLon / 2);
 
-    $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
-    return $earth * $c;
-};
-
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+        return $earth * $c;
+    };
 
     $grouped = $restaurants
         ->groupBy(function ($r) {
             $key = strtolower(trim((string) $r->category));
             return $key !== '' ? $key : 'uncategorized';
         })
-        ->map(function ($items, $key) use ($perCategory, $userLat, $userLng, $haversineKm) {
+        ->map(function ($items, $key) use ($perCategory, $userLat, $userLng, $haversineKm, $favorites) {
 
-            $cards = $items->take($perCategory)->map(function ($r) use ($userLat, $userLng, $haversineKm) {
+            $cards = $items->take($perCategory)->map(function ($r) use ($userLat, $userLng, $haversineKm, $favorites) {
 
                 $branch = $r->branches->first();
 
-                // ✅ branch lat/lng as double
                 $branchLat = ($branch && $branch->lat !== null) ? (double) $branch->lat : null;
                 $branchLng = ($branch && $branch->lng !== null) ? (double) $branch->lng : null;
 
-                // ✅ distance as double
                 $distanceKm = null;
                 if ($userLat !== null && $userLng !== null && $branchLat !== null && $branchLng !== null) {
                     $distanceKm = (double) round($haversineKm($userLat, $userLng, $branchLat, $branchLng), 2);
                 }
+
+                // ✅ check if restaurant is in favorites
+                $isFav = !empty(array_filter($favorites, function ($item) use ($r) {
+                    return (int)($item['restaurant_id'] ?? 0) === $r->id;
+                }));
 
                 return [
                     'id' => $r->id,
@@ -354,14 +354,14 @@ $haversineKm = function (float $lat1, float $lon1, float $lat2, float $lon2): fl
 
                     'location' => [
                         'address' => $branch?->address,
-                        'lat' => $branchLat, // double|null
-                        'lng' => $branchLng, // double|null
+                        'lat' => $branchLat,
+                        'lng' => $branchLng,
                     ],
 
-                    'distance_km' => $distanceKm, // double|null
-
+                    'distance_km' => $distanceKm,
                     'availability_status' => 'unknown',
-                    'is_fav' => false,
+
+                    'is_fav' => $isFav, // ✅ دلوقتي بقى ديناميك
                 ];
             })->values();
 
@@ -380,6 +380,7 @@ $haversineKm = function (float $lat1, float $lon1, float $lat2, float $lon2): fl
         'data' => $grouped,
     ]);
 }
+
 
 
 public function mobileNewOnTawletak(Request $request)

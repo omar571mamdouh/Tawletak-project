@@ -22,7 +22,9 @@ class MenuItemsTable
                 TextColumn::make('price')
                     ->money()
                     ->sortable(),
-                ImageColumn::make('image'),
+                ImageColumn::make('image')
+    ->disk('public')
+    ->height(50),
                 IconColumn::make('is_available')
                     ->boolean(),
                 IconColumn::make('is_featured')

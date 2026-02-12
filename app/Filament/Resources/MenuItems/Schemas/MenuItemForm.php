@@ -49,8 +49,10 @@ class MenuItemForm
                     ->default(0.0)
                     ->prefix('$'),
                     
-                FileUpload::make('image')
-                    ->image(),
+               FileUpload::make('image')
+    ->image()
+    ->directory('menu-items')
+    ->disk('public'),
                 Toggle::make('is_available')
                     ->required()
                     ->default(true),

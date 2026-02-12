@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Storage;
 use App\Models\MenuSection;
 use App\Models\Restaurant;
 use Illuminate\Http\Request;
@@ -58,7 +59,10 @@ class MenuController extends Controller
                                 'description' => $item->description,
                                 'price' => (float) $item->price,
                                 'currency' => $currency,
-                                'image' => $item->image ? asset('storage/private/' . $item->image) : null,
+ 'image' => $item->image
+    ? asset(Storage::url($item->image))
+    : null,
+
                                 'is_available' => (bool) $item->is_available,
                                 'is_featured' => (bool) $item->is_featured,
                                 'sort_order' => (int) $item->sort_order,
@@ -111,7 +115,10 @@ class MenuController extends Controller
                         'description' => $item->description,
                         'price' => (float) $item->price,
                         'currency' => $currency,
-                        'image' => $item->image ? asset('storage/private/' . $item->image) : null,
+'image' => $item->image
+    ? asset(Storage::url($item->image))
+    : null,
+
                         'is_available' => (bool) $item->is_available,
                         'is_featured' => (bool) $item->is_featured,
                         'sort_order' => (int) $item->sort_order,
@@ -149,7 +156,12 @@ class MenuController extends Controller
                         'description' => $item->description,
                         'price' => (float) $item->price,
                         'currency' => $currency,
-                        'image' => $item->image ? asset('storage/private/' . $item->image) : null,
+'image' => $item->image
+    ? asset(Storage::url($item->image))
+    : null,
+
+
+
                         'reviewsCount' => 10,   // قيمة تجريبية
                         'rating' => 4.5,        // قيمة تجريبية
                     ];

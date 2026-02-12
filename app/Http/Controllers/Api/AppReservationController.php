@@ -9,12 +9,14 @@ use Illuminate\Validation\ValidationException;
 
 class AppReservationController extends Controller
 {
-    /**
-     * Toggle this:
-     * - true  => mock mode (no DB)
-     * - false => DB mode (we'll add later when you create table)
-     */
     private bool $mockMode = true;
+
+    public function __construct()
+    {
+        if (!session()->has('mock_reservations')) {
+            session(['mock_reservations' => []]);
+        }
+    }
 
     private function ok(string $message, $data = null, int $code = 200)
     {
@@ -36,31 +38,34 @@ class AppReservationController extends Controller
 
     public function home(Request $request)
     {
-        // Mock dynamic-like payload
         $date = $request->query('date') ?? now()->toDateString();
+
+        $all = session('mock_reservations');
+        $items = array_filter($all, fn($r) => $r['date'] === $date);
 
         return $this->ok('Home reservations', [
             'date' => $date,
             'stats' => [
-                'bookings' => 0,
-                'pending'  => 0,
+                'bookings' => count($items),
+                'pending'  => count(array_filter($items, fn($r) => $r['status'] === 'pending')),
             ],
-            'items' => [], // later from DB
-        ]);
-    }
-
-    public function cancellations(Request $request)
-    {
-        return $this->ok('Recent cancellations', [
-            'items' => [], // later from DB
+            'items' => array_values($items),
         ]);
     }
 
     public function index(Request $request)
     {
-        // filters (ready for mobile)
-        $status = $request->query('status'); // pending/confirmed/cancelled
+        $status = $request->query('status');
         $date   = $request->query('date');
+
+        $items = session('mock_reservations');
+
+        if ($status) {
+            $items = array_filter($items, fn($r) => $r['status'] === $status);
+        }
+        if ($date) {
+            $items = array_filter($items, fn($r) => $r['date'] === $date);
+        }
 
         return $this->ok('Reservations list', [
             'filters' => [
@@ -70,9 +75,9 @@ class AppReservationController extends Controller
             'pagination' => [
                 'page' => (int)($request->query('page', 1)),
                 'per_page' => (int)($request->query('per_page', 10)),
-                'total' => 0,
+                'total' => count($items),
             ],
-            'items' => [], // later from DB
+            'items' => array_values($items),
         ]);
     }
 
@@ -80,11 +85,11 @@ class AppReservationController extends Controller
     {
         try {
             $data = $request->validate([
-                'restaurant_id'  => ['nullable','integer'], // خليه nullable دلوقتي
+                'restaurant_id'  => ['nullable','integer'],
                 'customer_name'  => ['required','string','max:255'],
                 'customer_phone' => ['nullable','string','max:50'],
                 'date'           => ['required','date'],
-                'time'           => ['required'], // keep simple
+                'time'           => ['required'],
                 'guests_count'   => ['required','integer','min:1'],
                 'table_id'       => ['nullable','integer'],
             ]);
@@ -92,27 +97,22 @@ class AppReservationController extends Controller
             return $this->fail('Validation error', $e->errors(), 422);
         }
 
-        // generate code like CODE-XXXXXX
         $data['code'] = 'CODE-' . strtoupper(Str::random(6));
         $data['status'] = 'pending';
-
-        // mock "id"
         $data['id'] = random_int(1000, 9999);
         $data['created_at'] = now()->toDateTimeString();
         $data['updated_at'] = now()->toDateTimeString();
 
-        // ✅ In mock mode: return what mobile needs
-        if ($this->mockMode) {
-            return $this->ok('Reservation created successfully (MOCK)', $data, 201);
-        }
+        // حفظ في session
+        $mock = session('mock_reservations');
+        $mock[] = $data;
+        session(['mock_reservations' => $mock]);
 
-        // DB mode will be added later (when you create table)
-        return $this->fail('DB mode not enabled yet', null, 501);
+        return $this->ok('Reservation created successfully (MOCK)', $data, 201);
     }
 
     public function update(Request $request, $id)
     {
-        // validate partial update
         try {
             $data = $request->validate([
                 'customer_name'  => ['sometimes','string','max:255'],
@@ -127,28 +127,41 @@ class AppReservationController extends Controller
             return $this->fail('Validation error', $e->errors(), 422);
         }
 
-        // mock response
-        return $this->ok('Reservation updated successfully (MOCK)', [
-            'id' => (int)$id,
-            'updated_fields' => $data,
-            'updated_at' => now()->toDateTimeString(),
-        ]);
+        $mock = session('mock_reservations');
+        foreach ($mock as &$r) {
+            if ($r['id'] == $id) {
+                $r = array_merge($r, $data);
+                $r['updated_at'] = now()->toDateTimeString();
+                session(['mock_reservations' => $mock]);
+                return $this->ok('Reservation updated successfully (MOCK)', $r);
+            }
+        }
+
+        return $this->fail('Reservation not found', null, 404);
     }
 
     public function destroy($id)
     {
-        return $this->ok('Reservation deleted successfully (MOCK)', [
-            'id' => (int)$id,
-        ]);
+        $mock = session('mock_reservations');
+        $mock = array_filter($mock, fn($r) => $r['id'] != $id);
+        session(['mock_reservations' => array_values($mock)]);
+
+        return $this->ok('Reservation deleted successfully (MOCK)', ['id' => (int)$id]);
     }
 
     public function confirm($id)
     {
-        return $this->ok('Reservation confirmed (MOCK)', [
-            'id' => (int)$id,
-            'status' => 'confirmed',
-            'updated_at' => now()->toDateTimeString(),
-        ]);
+        $mock = session('mock_reservations');
+        foreach ($mock as &$r) {
+            if ($r['id'] == $id) {
+                $r['status'] = 'confirmed';
+                $r['updated_at'] = now()->toDateTimeString();
+                session(['mock_reservations' => $mock]);
+                return $this->ok('Reservation confirmed (MOCK)', $r);
+            }
+        }
+
+        return $this->fail('Reservation not found', null, 404);
     }
 
     public function cancel(Request $request, $id)
@@ -161,11 +174,17 @@ class AppReservationController extends Controller
             return $this->fail('Validation error', $e->errors(), 422);
         }
 
-        return $this->ok('Reservation cancelled (MOCK)', [
-            'id' => (int)$id,
-            'status' => 'cancelled',
-            'reason' => $data['reason'] ?? null,
-            'cancelled_at' => now()->toDateTimeString(),
-        ]);
+        $mock = session('mock_reservations');
+        foreach ($mock as &$r) {
+            if ($r['id'] == $id) {
+                $r['status'] = 'cancelled';
+                $r['reason'] = $data['reason'] ?? null;
+                $r['cancelled_at'] = now()->toDateTimeString();
+                session(['mock_reservations' => $mock]);
+                return $this->ok('Reservation cancelled (MOCK)', $r);
+            }
+        }
+
+        return $this->fail('Reservation not found', null, 404);
     }
 }

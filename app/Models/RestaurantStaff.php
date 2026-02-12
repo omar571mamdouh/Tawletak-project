@@ -95,4 +95,19 @@ public function hasPermission(string $permissionKey): bool
         ->contains('key', $permissionKey);
 }
 
+
+// ✅ Virtual attribute للـ Form
+protected $appends = ['restaurant_role_id'];
+
+public function getRestaurantRoleIdAttribute()
+{
+    return $this->roleAssignment?->restaurant_role_id;
+}
+
+public function setRestaurantRoleIdAttribute($value)
+{
+    // ✅ هيتحفظ في afterSave في الـ Resource
+    $this->attributes['_temp_role_id'] = $value;
+}
+
 }

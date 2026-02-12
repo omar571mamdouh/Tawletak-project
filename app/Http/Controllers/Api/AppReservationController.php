@@ -7,6 +7,8 @@ use App\Models\AppReservation; // ⬅️ هنا التغيير
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use App\Models\Restaurant;
+use Illuminate\Support\Facades\Cache;
 
 class AppReservationController extends Controller
 {
@@ -28,21 +30,129 @@ class AppReservationController extends Controller
         ], $code);
     }
 
-    public function home(Request $request)
-    {
-        $date = $request->query('date') ?? now()->toDateString();
+   public function home(Request $request)
+{
+    $data = $request->validate([
+        'lat' => ['nullable', 'numeric'],
+        'lng' => ['nullable', 'numeric'],
+        'limit' => ['nullable', 'integer', 'min:1', 'max:50'],
+    ]);
 
-        $items = AppReservation::where('date', $date)->get();
+    $limit = (int) ($data['limit'] ?? 10);
 
-        return $this->ok('Home reservations', [
-            'date' => $date,
-            'stats' => [
-                'bookings' => $items->count(),
-                'pending'  => $items->where('status', 'pending')->count(),
-            ],
-            'items' => $items,
-        ]);
+    // ✅ user location for distance calculation
+    $userLat = $request->filled('lat') ? (double) $request->lat : null;
+    $userLng = $request->filled('lng') ? (double) $request->lng : null;
+
+    // ✅ get logged customer favorites from cache
+    $customer = $request->user('customer');
+    $favorites = [];
+
+    if ($customer) {
+        $key = "favorites:user:{$customer->id}";
+        $favorites = Cache::get($key, []);
     }
+
+    // ✅ get recommended restaurants (active only)
+    $restaurants = Restaurant::query()
+        ->select([
+            'id',
+            'name',
+            'description',
+            'phone',
+            'category',
+            'price_range',
+            'is_active',
+            'created_at',
+            'updated_at',
+            // 'logo', // لو عندك
+            // 'cover_image', // لو عندك
+        ])
+        ->with(['branches:id,restaurant_id,address,lat,lng,is_active']) // ✅ شيلت name و city
+        ->where('is_active', true)
+        ->latest()
+        ->limit($limit)
+        ->get();
+
+    // ✅ haversine distance calculation
+    $haversineKm = function (float $lat1, float $lon1, float $lat2, float $lon2): float {
+        $earth = 6371.0;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
+
+        $a = sin($dLat / 2) * sin($dLat / 2)
+           + cos(deg2rad($lat1)) * cos(deg2rad($lat2))
+           * sin($dLon / 2) * sin($dLon / 2);
+
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+        return $earth * $c;
+    };
+
+    // ✅ transform restaurants to match mobile UI
+    $recommended = $restaurants->map(function ($restaurant) use ($userLat, $userLng, $haversineKm, $favorites) {
+        
+        // get first active branch
+        $branch = $restaurant->branches->where('is_active', true)->first();
+
+        $branchLat = ($branch && $branch->lat !== null) ? (double) $branch->lat : null;
+        $branchLng = ($branch && $branch->lng !== null) ? (double) $branch->lng : null;
+
+        // calculate distance
+        $distanceKm = null;
+        if ($userLat !== null && $userLng !== null && $branchLat !== null && $branchLng !== null) {
+            $distanceKm = (double) round($haversineKm($userLat, $userLng, $branchLat, $branchLng), 1);
+        }
+
+        // ✅ check if restaurant is in favorites
+        $isFav = collect($favorites)
+            ->pluck('restaurant_id')
+            ->contains($restaurant->id);
+
+        return [
+            'id' => $restaurant->id,
+            'name' => $restaurant->name,
+            'description' => $restaurant->description,
+            'category' => $restaurant->category,
+            'price_range' => $restaurant->price_range,
+            
+            // ✅ images (غيّر حسب نظامك)
+            'cover_image' => null, // TODO: لو عندك cover_image في restaurants table
+            'logo' => null, // TODO: لو عندك logo في restaurants table
+            
+            // ✅ rating (لو عندك reviews table)
+            'rating' => 4.5, // TODO: احسبه من reviews
+            'reviews_count' => 0, // TODO: احسبه من reviews
+            
+            // ✅ location info
+            'location' => [
+                'address' => $branch?->address,
+                'city' => 'Amman, Jordan', // ✅ static لحد ما تضيف city column
+                'lat' => $branchLat,
+                'lng' => $branchLng,
+            ],
+            
+            // ✅ distance
+            'distance_km' => $distanceKm,
+            'distance_text' => $distanceKm ? "{$distanceKm} km away" : null,
+            
+            // ✅ availability
+            'tables_available' => true, // TODO: احسبه من available_time
+            'availability_status' => 'Tables Available', // أو 'Few Tables Left' أو 'Fully Booked'
+            
+            // ✅ favorite status
+            'is_fav' => $isFav,
+        ];
+    });
+
+    return response()->json([
+        'success' => true,
+        'data' => [
+            'title' => 'Recommended for You',
+            'restaurants' => $recommended,
+            'total' => $recommended->count(),
+        ],
+    ]);
+}
 
     public function index(Request $request)
     {

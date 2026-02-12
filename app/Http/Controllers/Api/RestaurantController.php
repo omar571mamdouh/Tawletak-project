@@ -399,25 +399,34 @@ public function mobileNewOnTawletak(Request $request)
             'category',
             'is_active',
             'created_at',
-            // لو عندك logo/cover_image ضيفه هنا
-            // 'logo',
-            // 'cover_image',
         ])
         ->where('is_active', true)
-        ->latest(); // latest created_at
+        ->latest();
 
     if ($request->filled('search')) {
         $search = $request->search;
         $q->where('name', 'like', "%$search%");
     }
 
-      $items = $q->limit(8)->get();
+    $items = $q->with('branches')->limit($perPage)->get()->map(function ($restaurant) {
+        $branch = $restaurant->branches->first();
 
-     return response()->json([
+        return [
+            'id' => $restaurant->id,
+            'name' => $restaurant->name,
+           
+            'cover_image' => $branch?->cover_image 
+                ? asset('storage/private/' . $branch->cover_image) 
+                : null, // null لو مفيش صورة
+        ];
+    });
+
+    return response()->json([
         'success' => true,
         'data' => [
             'items' => $items,
         ],
     ]);
 }
+
 }

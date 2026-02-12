@@ -152,7 +152,7 @@ class FavoriteController extends Controller
      * POST /customer/favorites
      * Add favorite (store full card)
      */
-   public function store(Request $request)
+  public function store(Request $request)
 {
     $customer = $this->currentCustomer($request);
     if (!$customer) {
@@ -162,72 +162,56 @@ class FavoriteController extends Controller
         ], 401);
     }
 
-    // Validate فقط الـ restaurant_id
     $validated = $request->validate([
-        'restaurant_id' => ['required', 'integer', 'exists:restaurants,id'],
+        'restaurant_id' => ['required', 'integer', 'min:1'],
     ]);
 
-    $restaurantId = (int) $validated['restaurant_id'];
+    $restaurantId = (int)$validated['restaurant_id'];
 
-    // جلب المطعم من DB مع أول فرع
+    // جلب المطعم مع أول فرع
     $restaurant = \App\Models\Restaurant::with('branches')->find($restaurantId);
     $branch = $restaurant?->branches->first();
 
-    if (!$restaurant) {
+    if (!$restaurant || !$branch) {
         return response()->json([
             'success' => false,
-            'message' => 'Restaurant not found',
-        ], 404);
+            'message' => 'Cannot add to favorites: restaurant or branch not found.',
+        ], 400);
     }
 
-    $favKey = $this->cacheKey($customer->id);
-    $items = $this->normalizeItems(Cache::get($favKey, []));
+    // إعداد الكاش
+    $key = $this->cacheKey($customer->id);
+    $items = $this->normalizeItems(Cache::get($key, []));
 
     // منع التكرار
-    $items = array_values(array_filter($items, fn($item) => (int)($item['restaurant_id'] ?? 0) !== $restaurantId));
+    $items = array_values(array_filter($items, function ($item) use ($restaurantId) {
+        return (int)($item['restaurant_id'] ?? 0) !== $restaurantId;
+    }));
 
-    // إضافة المطعم للمفضلة
+    // إضافة المطعم للفافوريت
     $newItem = [
         'restaurant_id' => $restaurant->id,
+        'restaurant_name' => $restaurant->name,
+        'banner_url' => $branch->cover_image ? asset('storage/private/' . $branch->cover_image) : null,
+        'rating' => 0,
+        'reviews_count' => 0,
+        'category_name' => $restaurant->category,
+        'location_text' => $branch->address,
+        'distance_km' => null,
+        'tables_available' => true,
         'is_favorite' => true,
     ];
 
     $items[] = $newItem;
-
-    // حفظ الكاش
-    Cache::put($favKey, $items, now()->addDays(30));
-
-    // تكوين الريسبونس بالبيانات الحقيقية من DB
-    $branchLat = $branch?->lat ? (double)$branch->lat : null;
-    $branchLng = $branch?->lng ? (double)$branch->lng : null;
-
-    $responseData = [
-        'id' => $restaurant->id,
-        'name' => $restaurant->name,
-        'description' => $restaurant->description,
-        'phone' => $restaurant->phone,
-        'category' => $restaurant->category,
-        'price_range' => $restaurant->price_range,
-        'is_active' => (bool)$restaurant->is_active,
-        'created_at' => $restaurant->created_at,
-        'updated_at' => $restaurant->updated_at,
-        'cover_image' => $branch?->cover_image ? asset('storage/private/' . $branch->cover_image) : null,
-        'rating' => 0, // لو عايز تجيب من جدول التقييمات ممكن تضيف هنا
-        'reviews_count' => 0,
-        'location' => [
-            'address' => $branch?->address ?? null,
-            'lat' => $branchLat,
-            'lng' => $branchLng,
-        ],
-        'is_fav' => true,
-    ];
+    Cache::put($key, $items, now()->addDays(30));
 
     return response()->json([
         'success' => true,
         'message' => 'Added to favorites',
-        'data' => $responseData,
+        'data' => $newItem,
     ], 201);
 }
+
 
 
     /**

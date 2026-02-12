@@ -88,7 +88,7 @@ class FavoriteController extends Controller
         return $earth * $c;
     };
 
-    $restaurants = array_map(function ($item) use ($userLat, $userLng, $haversineKm) {
+    $restaurants = array_map(function ($item) use ($items, $userLat, $userLng, $haversineKm) {
 
         // جلب الـ restaurant من الـ DB مع أول فرع
         $restaurant = \App\Models\Restaurant::with(['branches'])->find($item['restaurant_id']);
@@ -101,6 +101,11 @@ class FavoriteController extends Controller
         if ($userLat !== null && $userLng !== null && $branchLat !== null && $branchLng !== null) {
             $distanceKm = round($haversineKm($userLat, $userLng, $branchLat, $branchLng), 2);
         }
+
+        // ✅ تحقق إذا المطعم موجود في الكاش
+        $isFav = !empty(array_filter($items, function ($favItem) use ($restaurant) {
+            return (int)($favItem['restaurant_id'] ?? 0) === ($restaurant->id ?? 0);
+        }));
 
         return [
             'id' => $restaurant->id ?? 0,
@@ -125,7 +130,7 @@ class FavoriteController extends Controller
 
             'distance_km' => $distanceKm,
             'availability_status' => 'unknown',
-            'is_fav' => true,
+            'is_fav' => $isFav, // ✅ هنا
         ];
     }, $items);
 
@@ -142,66 +147,88 @@ class FavoriteController extends Controller
 
 
 
+
     /**
      * POST /customer/favorites
      * Add favorite (store full card)
      */
-    public function store(Request $request)
-    {
-        $customer = $this->currentCustomer($request);
-        if (!$customer) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthenticated',
-            ], 401);
-        }
-
-        $data = $request->validate([
-            'restaurant_id'     => ['required', 'integer', 'min:1'],
-            'restaurant_name'   => ['required', 'string', 'max:255'],
-            'banner_url'        => ['nullable', 'string'],
-            'rating'            => ['nullable', 'numeric', 'min:0', 'max:5'],
-            'reviews_count'     => ['nullable', 'integer', 'min:0'],
-            'category_name'     => ['nullable', 'string'],
-            'location_text'     => ['nullable', 'string'],
-            'distance_km'       => ['nullable', 'numeric', 'min:0'],
-            'tables_available'  => ['nullable', 'boolean'],
-        ]);
-
-        $key = $this->cacheKey($customer->id);
-        $items = $this->normalizeItems(Cache::get($key, []));
-
-        // Remove if exists (avoid duplicates)
-        $items = array_values(array_filter($items, function ($item) use ($data) {
-            return (int)($item['restaurant_id'] ?? 0) !== (int)$data['restaurant_id'];
-        }));
-
-        $newCard = [
-            'restaurant_id'     => (int) $data['restaurant_id'],
-            'restaurant_name'   => $data['restaurant_name'],
-            'banner_url'        => $data['banner_url'] ?? null,
-            'rating'            => isset($data['rating']) ? (float) $data['rating'] : 0.0,
-            'reviews_count'     => (int) ($data['reviews_count'] ?? 0),
-            'category_name'     => $data['category_name'] ?? null,
-            'location_text'     => $data['location_text'] ?? null,
-            'distance_km'       => isset($data['distance_km']) ? (float) $data['distance_km'] : null,
-            'tables_available'  => (bool) ($data['tables_available'] ?? true),
-            'is_favorite'       => true,
-        ];
-
-        $items[] = $newCard;
-
-        Cache::put($key, $items, now()->addDays(30));
-
+   public function store(Request $request)
+{
+    $customer = $this->currentCustomer($request);
+    if (!$customer) {
         return response()->json([
-            'success' => true,
-            'message' => 'Added to favorites',
-            'data' => [
-                'item' => $newCard,
-                'total_favorites' => count($items),
-            ],
-        ], 201);
+            'success' => false,
+            'message' => 'Unauthenticated',
+        ], 401);
     }
+
+    // Validate فقط الـ restaurant_id
+    $validated = $request->validate([
+        'restaurant_id' => ['required', 'integer', 'exists:restaurants,id'],
+    ]);
+
+    $restaurantId = (int) $validated['restaurant_id'];
+
+    // جلب المطعم من DB مع أول فرع
+    $restaurant = \App\Models\Restaurant::with('branches')->find($restaurantId);
+    $branch = $restaurant?->branches->first();
+
+    if (!$restaurant) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Restaurant not found',
+        ], 404);
+    }
+
+    $favKey = $this->cacheKey($customer->id);
+    $items = $this->normalizeItems(Cache::get($favKey, []));
+
+    // منع التكرار
+    $items = array_values(array_filter($items, fn($item) => (int)($item['restaurant_id'] ?? 0) !== $restaurantId));
+
+    // إضافة المطعم للمفضلة
+    $newItem = [
+        'restaurant_id' => $restaurant->id,
+        'is_favorite' => true,
+    ];
+
+    $items[] = $newItem;
+
+    // حفظ الكاش
+    Cache::put($favKey, $items, now()->addDays(30));
+
+    // تكوين الريسبونس بالبيانات الحقيقية من DB
+    $branchLat = $branch?->lat ? (double)$branch->lat : null;
+    $branchLng = $branch?->lng ? (double)$branch->lng : null;
+
+    $responseData = [
+        'id' => $restaurant->id,
+        'name' => $restaurant->name,
+        'description' => $restaurant->description,
+        'phone' => $restaurant->phone,
+        'category' => $restaurant->category,
+        'price_range' => $restaurant->price_range,
+        'is_active' => (bool)$restaurant->is_active,
+        'created_at' => $restaurant->created_at,
+        'updated_at' => $restaurant->updated_at,
+        'cover_image' => $branch?->cover_image ? asset('storage/private/' . $branch->cover_image) : null,
+        'rating' => 0, // لو عايز تجيب من جدول التقييمات ممكن تضيف هنا
+        'reviews_count' => 0,
+        'location' => [
+            'address' => $branch?->address ?? null,
+            'lat' => $branchLat,
+            'lng' => $branchLng,
+        ],
+        'is_fav' => true,
+    ];
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Added to favorites',
+        'data' => $responseData,
+    ], 201);
+}
+
 
     /**
      * DELETE /customer/favorites/{restaurantId}

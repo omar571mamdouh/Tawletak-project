@@ -42,7 +42,7 @@ The **Customers** module is the core of the system. Each customer profile contai
 
 ## 📅 Reservations
 
-![Reservations](screenshots/reservations.png)
+![Reservations](screenshots/reservations.jpeg)
 
 The **Reservations** tab under each customer displays a full history of their bookings. Each reservation record shows the **branch name**, **table number**, **party size**, **reservation time**, **expected duration in minutes**, **status** (e.g., `completed`), and the **source** of the booking (e.g., `app`). Admins can also create a **New Reservation** directly from the customer profile using the dedicated button.
 
@@ -50,7 +50,7 @@ The **Reservations** tab under each customer displays a full history of their bo
 
 ## ⏳ Waitlists
 
-![Waitlists](screenshots/waitlists.png)
+![Waitlists](screenshots/waitlists.jpeg)
 
 The **Waitlists** module tracks customers who are queued and waiting for an available table at a specific branch. Each waitlist entry is linked to a customer and a branch, allowing staff to manage queue flow efficiently. The sidebar shows a live count of active waitlist entries.
 
@@ -58,7 +58,7 @@ The **Waitlists** module tracks customers who are queued and waiting for an avai
 
 ## 👣 Visits
 
-![Visits](screenshots/visits.png)
+![Visits](screenshots/visits.jpeg)
 
 The **Visits** module records every time a customer physically visits a restaurant branch. This data is useful for tracking customer frequency, analyzing peak hours, and understanding customer behavior patterns across different branches.
 
@@ -66,7 +66,7 @@ The **Visits** module records every time a customer physically visits a restaura
 
 ## 🎖️ Customer Loyalties
 
-![Customer Loyalties](screenshots/customer-loyalties.png)
+![Customer Loyalties](screenshots/customer-loyalities.jpeg)
 
 The **Customer Loyalties** module tracks the loyalty points each customer has accumulated through their reservations and visits. Points are tied to loyalty tiers and can be redeemed against available offers. Admins can view and manage loyalty balances directly from the customer profile.
 
@@ -74,7 +74,7 @@ The **Customer Loyalties** module tracks the loyalty points each customer has ac
 
 ## 📆 Reservation Events
 
-![Reservation Events](screenshots/reservation-events.png)
+![Reservation Events](screenshots/reservations-event.jpeg)
 
 **Reservation Events** log every status change or action that happens on a reservation (e.g., created, modified, cancelled, completed). This provides a full audit trail for each booking, helping admins and managers track the reservation lifecycle and resolve any disputes.
 
@@ -82,7 +82,7 @@ The **Customer Loyalties** module tracks the loyalty points each customer has ac
 
 ## 🏠 Restaurants
 
-![Restaurants](screenshots/restaurants.png)
+![Restaurants](screenshots/restaurants.jpeg)
 
 The **Restaurants** module manages the top-level restaurant entities in the system. Each restaurant can have multiple branches, menus, and staff. Admins can create, edit, or delete restaurants and configure their basic information.
 
@@ -90,7 +90,7 @@ The **Restaurants** module manages the top-level restaurant entities in the syst
 
 ## 📍 Restaurant Branches
 
-![Restaurant Branches](screenshots/restaurant-branches.png)
+![Restaurant Branches](screenshots/restaurant-branches.jpeg)
 
 **Restaurant Branches** represent individual physical locations under a restaurant. Each branch can have its own tables, staff, operating hours, and reservations. This allows the system to handle multi-location restaurant chains efficiently.
 

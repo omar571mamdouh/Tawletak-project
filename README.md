@@ -146,7 +146,7 @@ The **Tables** module allows admins to configure all physical tables across ever
 
 ## ⭐ Loyalty Tiers
 
-![Loyalty Tiers](screenshots/loyalty-tiers.png)
+![Loyalty Tiers](screenshots/loyalty-tiers.jpeg)
 
 **Loyalty Tiers** define the levels of the rewards program (e.g., Bronze, Silver, Gold). Each tier has its own thresholds and benefits. Customers are automatically assigned to tiers based on their accumulated loyalty points.
 

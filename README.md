@@ -104,14 +104,6 @@ The **Restaurant Staff** module manages employees assigned to each branch. Each 
 
 ---
 
-## 🎭 Restaurant Roles
-
-![Restaurant Roles](screenshots/restaurant-roles.png)
-
-**Restaurant Roles** define the job types within a restaurant (e.g., manager, waiter, host). These roles are assigned to staff members and can be used to control what each staff member is responsible for within their branch.
-
----
-
 ## 🪑 Tables
 
 ![Tables](screenshots/tables.jpeg)

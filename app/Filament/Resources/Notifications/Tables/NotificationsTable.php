@@ -18,9 +18,6 @@ class NotificationsTable
             ->columns([
                 TextColumn::make('recipient_type')
                     ->badge(),
-                TextColumn::make('recipient_id')
-                    ->numeric()
-                    ->sortable(),
                 TextColumn::make('type')
                     ->searchable(),
                 TextColumn::make('title')

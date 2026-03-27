@@ -98,7 +98,7 @@ The **Restaurants** module manages the top-level restaurant entities in the syst
 
 ## 👨‍🍳 Restaurant Staff
 
-![Restaurant Staff](screenshots/restaurant-staff.png)
+![Restaurant Staff](screenshots/restaurantstaff.jpeg)
 
 The **Restaurant Staff** module manages employees assigned to each branch. Each staff member is linked to a branch and assigned a role. This helps in managing access levels and responsibilities for each team member within the restaurant operation.
 
@@ -114,7 +114,7 @@ The **Restaurant Staff** module manages employees assigned to each branch. Each 
 
 ## 🪑 Tables
 
-![Tables](screenshots/tables.png)
+![Tables](screenshots/tables.jpeg)
 
 The **Tables** module allows admins to configure all physical tables across every branch. Each table has a number, capacity, and is linked to a specific branch. Tables are used directly in the reservation and waitlist systems.
 
@@ -122,7 +122,7 @@ The **Tables** module allows admins to configure all physical tables across ever
 
 ## 🚦 Table Statuses
 
-![Table Statuses](screenshots/table-statuses.png)
+![Table Statuses](screenshots/table-status.jpeg)
 
 **Table Statuses** define the possible states a table can be in — such as `available`, `occupied`, `reserved`, or `cleaning`. These statuses are displayed in real-time on the dashboard to help staff manage floor operations efficiently.
 
@@ -130,7 +130,7 @@ The **Tables** module allows admins to configure all physical tables across ever
 
 ## 📜 Table Status Histories
 
-![Table Status Histories](screenshots/table-status-histories.png)
+![Table Status Histories](screenshots/table-status-history.jpeg)
 
 **Table Status Histories** provide a full chronological log of every status change for every table. With 14+ recorded entries, this module is essential for operational auditing and understanding table utilization patterns over time.
 
@@ -138,7 +138,7 @@ The **Tables** module allows admins to configure all physical tables across ever
 
 ## 🍕 Menu Sections
 
-![Menu Sections](screenshots/menu-sections.png)
+![Menu Sections](screenshots/menusection-items.jpeg)
 
 **Menu Sections** allow admins to organize the restaurant menu into logical categories such as starters, main courses, desserts, and beverages. Each section acts as a container for related menu items.
 
@@ -146,7 +146,7 @@ The **Tables** module allows admins to configure all physical tables across ever
 
 ## 🥗 Menu Items
 
-![Menu Items](screenshots/menu-items.png)
+![Menu Items](screenshots/menusection-items.jpeg)
 
 **Menu Items** are the individual dishes and drinks listed under each menu section. Each item can include a name, description, price, and availability status. The menu is fully manageable from the admin panel.
 
@@ -162,7 +162,7 @@ The **Tables** module allows admins to configure all physical tables across ever
 
 ## 🎁 Offer Redemptions
 
-![Offer Redemptions](screenshots/offer-redemptions.png)
+![Offer Redemptions](screenshots/offer-redemptions.jpeg)
 
 The **Offer Redemptions** tab tracks which promotional offers each customer has used. This data helps admins measure the effectiveness of campaigns and ensure that offer usage rules (e.g., one-time use) are enforced correctly.
 
@@ -170,7 +170,7 @@ The **Offer Redemptions** tab tracks which promotional offers each customer has 
 
 ## 🔔 Notifications
 
-![Notifications](screenshots/notifications.png)
+![Notifications](screenshots/notifications.jpeg)
 
 The **Notifications** module enables admins to send targeted push or in-app notifications to customers. Notifications can be used to inform customers about upcoming reservations, special offers, loyalty rewards, or general announcements.
 
@@ -178,7 +178,7 @@ The **Notifications** module enables admins to send targeted push or in-app noti
 
 ## 📋 Activities
 
-![Activities](screenshots/activities.png)
+![Activities](screenshots/activities.jpeg)
 
 The **Activities** log records every action performed by admin users within the system (82+ entries). This includes creating, updating, or deleting any resource. It serves as a complete audit trail for accountability and system monitoring.
 
@@ -186,7 +186,7 @@ The **Activities** log records every action performed by admin users within the 
 
 ## 👥 Users
 
-![Users](screenshots/users.png)
+![Users](screenshots/users.jpeg)
 
 The **Users** module manages admin accounts that have access to the dashboard. Each user can be assigned roles and permissions to control what they can view or modify within the system.
 
@@ -194,7 +194,7 @@ The **Users** module manages admin accounts that have access to the dashboard. E
 
 ## 🎯 User Roles
 
-![User Roles](screenshots/user-roles.png)
+![User Roles](screenshots/userroles.jpeg)
 
 **User Roles** group a set of permissions together and assign them to admin users. This simplifies access management by allowing admins to assign a role instead of configuring permissions individually for each user.
 
@@ -202,7 +202,7 @@ The **Users** module manages admin accounts that have access to the dashboard. E
 
 ## 🔑 User Permissions
 
-![User Permissions](screenshots/user-permissions.png)
+![User Permissions](screenshots/user-permissions.jpeg)
 
 **User Permissions** provide granular control over what each admin user can do in the system. With 120+ individual permissions available, the system supports fine-grained access control for every module and action.
 
@@ -210,7 +210,7 @@ The **Users** module manages admin accounts that have access to the dashboard. E
 
 ## 🛡️ Permissions
 
-![Permissions](screenshots/permissions.png)
+![Permissions](screenshots/user-permissions.jpeg)
 
 The **Permissions** registry is the master list of all system-level permissions. These are the building blocks used to construct roles and assign access rights across the entire admin panel.
 
